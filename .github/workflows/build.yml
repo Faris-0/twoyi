@@ -31,10 +31,10 @@ jobs:
       - name: Build Rust Library Manually
         run: |
           cd app/rs
-          # Kita gunakan cargo-xdk secara eksplisit ke target ARM64
-          cargo xdk --ndk $ANDROID_NDK_HOME --target aarch64-linux-android --android 21 build --release
+          # Kita hapus flag --ndk karena sudah ada di env
+          cargo xdk --target aarch64-linux-android --android 21 build --release
           
-          # Pindahkan hasil build ke folder yang dikenali Android Studio
+          # Pindahkan hasil build
           mkdir -p ../src/main/jniLibs/arm64-v8a
           cp target/aarch64-linux-android/release/libtwoyi.so ../src/main/jniLibs/arm64-v8a/
 
