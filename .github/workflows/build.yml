@@ -25,26 +25,23 @@ jobs:
           unzip -q android-ndk-r22b-linux-x86_64.zip
           echo "ANDROID_NDK_HOME=$(pwd)/android-ndk-r22b" >> $GITHUB_ENV
 
-      - name: Build Rust Library (Manual Linker)
+      - name: Build Rust Library
         run: |
           cd app/rs
-          # Tentukan Toolchain NDK secara eksplisit agar tidak salah pakai Linker Ubuntu
           export TOOLCHAIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64
-          export AR=$TOOLCHAIN/bin/llvm-ar
           export CC=$TOOLCHAIN/bin/aarch64-linux-android21-clang
-          export CXX=$TOOLCHAIN/bin/aarch64-linux-android21-clang++
-          export LD=$TOOLCHAIN/bin/aarch64-linux-android-ld
           
-          # Konfigurasi Cargo agar menggunakan linker NDK yang benar
+          # Tambahkan library path secara manual agar -lunwind ditemukan
+          # r22b menyimpan libunwind di folder clang/lib/linux/aarch64
+          export CLANG_LIB=$TOOLCHAIN/lib64/clang/12.0.8/lib/linux/aarch64
+          export RUSTFLAGS="-L $CLANG_LIB -L $ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/21"
+
           mkdir -p .cargo
           echo "[target.aarch64-linux-android]" > .cargo/config.toml
           echo "linker = \"$CC\"" >> .cargo/config.toml
-          echo "ar = \"$AR\"" >> .cargo/config.toml
 
-          # Build MURNI 64-bit menggunakan cargo standar (Bypass cargo-xdk yang rewel)
           cargo build --target aarch64-linux-android --release
 
-          # Pindahkan hasil build
           mkdir -p ../src/main/jniLibs/arm64-v8a
           cp target/aarch64-linux-android/release/libtwoyi.so ../src/main/jniLibs/arm64-v8a/
 
