@@ -28,4 +28,10 @@ jobs:
           echo "ANDROID_NDK_HOME=$(pwd)/android-ndk-r22b" >> $GITHUB_ENV
 
       - name: Build with Gradle
-        run: ./gradlew assembleDebug
+        run: |
+          # Membuat symlink untuk libunwind jika hilang di NDK r22b
+          ln -s ${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/lib64/clang/11.0.5/lib/linux/aarch64/libunwind.a ${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libunwind.a || true
+          
+          chmod +x gradlew
+          ./gradlew cargoBuild --info
+          ./gradlew assembleDebug
