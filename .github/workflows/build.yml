@@ -1,0 +1,31 @@
+name: Build Twoyi
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          java-version: '11'
+          distribution: 'adopt'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Install cargo-xdk
+        run: cargo install cargo-xdk
+
+      - name: Install NDK r22b
+        run: |
+          wget https://dl.google.com/android/repository/android-ndk-r22b-linux-x86_64.zip
+          unzip -q android-ndk-r22b-linux-x86_64.zip
+          echo "ANDROID_NDK_HOME=$(pwd)/android-ndk-r22b" >> $GITHUB_ENV
+
+      - name: Build with Gradle
+        run: ./gradlew assembleDebug
