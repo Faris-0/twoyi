@@ -5,7 +5,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout Code
+        uses: actions/checkout@v3
 
       - name: Setup Java
         uses: actions/setup-java@v3
@@ -23,15 +24,28 @@ jobs:
 
       - name: Install NDK r22b
         run: |
-          wget https://dl.google.com/android/repository/android-ndk-r22b-linux-x86_64.zip
+          wget -q https://dl.google.com/android/repository/android-ndk-r22b-linux-x86_64.zip
           unzip -q android-ndk-r22b-linux-x86_64.zip
           echo "ANDROID_NDK_HOME=$(pwd)/android-ndk-r22b" >> $GITHUB_ENV
 
-      - name: Build with Gradle
+      - name: Build Rust Library Manually
         run: |
-          # Membuat symlink untuk libunwind jika hilang di NDK r22b
-          ln -s ${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/lib64/clang/11.0.5/lib/linux/aarch64/libunwind.a ${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libunwind.a || true
+          cd app/rs
+          # Kita gunakan cargo-xdk secara eksplisit ke target ARM64
+          cargo xdk --ndk $ANDROID_NDK_HOME --target aarch64-linux-android --android 21 build --release
           
+          # Pindahkan hasil build ke folder yang dikenali Android Studio
+          mkdir -p ../src/main/jniLibs/arm64-v8a
+          cp target/aarch64-linux-android/release/libtwoyi.so ../src/main/jniLibs/arm64-v8a/
+
+      - name: Build Android APK
+        run: |
           chmod +x gradlew
-          ./gradlew cargoBuild --info
-          ./gradlew assembleDebug
+          # -x :app:cargoBuild artinya kita melewati build otomatis karena sudah manual di atas
+          ./gradlew assembleDebug -x :app:cargoBuild
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Twoyi-Debug-APK
+          path: app/build/outputs/apk/debug/*.apk
