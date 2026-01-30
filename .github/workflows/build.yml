@@ -17,7 +17,8 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-linux-android
+          # Kita tambahkan kedua target supaya cargo-xdk tidak protes
+          targets: aarch64-linux-android, armv7-linux-androideabi
 
       - name: Install cargo-xdk
         run: cargo install cargo-xdk
@@ -32,11 +33,17 @@ jobs:
         run: |
           cd app/rs
           export ANDROID_NATIVE_API_LEVEL=21
-          # Pakai --target tunggal agar tidak bentrok dengan config internal Cargo.toml
-          cargo xdk build --target aarch64-linux-android --release
+          # Biarkan dia build semua target yang dia mau
+          cargo xdk build --release
           
+          # Buat folder untuk menampung hasil build
           mkdir -p ../src/main/jniLibs/arm64-v8a
+          mkdir -p ../src/main/jniLibs/armeabi-v7a
+          
+          # Copy hasil build 64-bit
           cp target/aarch64-linux-android/release/libtwoyi.so ../src/main/jniLibs/arm64-v8a/
+          # Copy hasil build 32-bit (jika ada)
+          cp target/armv7-linux-androideabi/release/libtwoyi.so ../src/main/jniLibs/armeabi-v7a/ || true
 
       - name: Build Android APK
         run: |
