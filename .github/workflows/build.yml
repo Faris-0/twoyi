@@ -17,7 +17,8 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-linux-android
+          # Kita install dua-duanya agar proses kompilasi tidak error di tengah jalan
+          targets: aarch64-linux-android, armv7-linux-androideabi
 
       - name: Install cargo-xdk
         run: cargo install cargo-xdk
@@ -26,31 +27,28 @@ jobs:
         run: |
           wget -q https://dl.google.com/android/repository/android-ndk-r22b-linux-x86_64.zip
           unzip -q android-ndk-r22b-linux-x86_64.zip
-          # Set variabel lingkungan permanen untuk session ini
           echo "ANDROID_NDK_HOME=$(pwd)/android-ndk-r22b" >> $GITHUB_ENV
-          echo "NDK_HOME=$(pwd)/android-ndk-r22b" >> $GITHUB_ENV
 
       - name: Build Rust Library Manually
         run: |
           cd app/rs
-          # Hapus target 32bit dari Cargo.toml secara paksa agar tidak diproses
-          sed -i 's/targets = .*/targets = ["arm64-v8a"]/' ../../Cargo.toml || true
+          
+          # Hapus setting targets di Cargo.toml lokal supaya tidak otomatis build dua-duanya
+          # Kita gunakan -i.bak agar aman
+          sed -i.bak 's/targets = .*/targets = ["arm64-v8a"]/' Cargo.toml || true
           
           export ANDROID_NATIVE_API_LEVEL=21
           
-          # Gunakan perintah build yang paling spesifik
+          # Build khusus 64-bit saja
           cargo xdk build --target aarch64-linux-android --release
           
-          # Buat folder jniLibs
+          # Pindahkan hasil ke jniLibs
           mkdir -p ../src/main/jniLibs/arm64-v8a
-          
-          # Copy hasil build
           cp target/aarch64-linux-android/release/libtwoyi.so ../src/main/jniLibs/arm64-v8a/
 
       - name: Build Android APK
         run: |
           chmod +x gradlew
-          # Tambahkan flag untuk mengabaikan task cargoBuild bawaan
           ./gradlew assembleDebug -x :app:cargoBuild
 
       - name: Upload APK
