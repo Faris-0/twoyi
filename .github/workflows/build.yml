@@ -29,23 +29,27 @@ jobs:
         run: |
           cd app/rs
           export TOOLCHAIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64
+          export TARGET_CC=$TOOLCHAIN/bin/aarch64-linux-android21-clang
           
-          # Kita langsung arahkan ke folder library 64-bit yang pasti ada di r22b
-          # Path ini adalah standar untuk NDK r22b ARM64
-          export LIB_PATH="$TOOLCHAIN/sysroot/usr/lib/aarch64-linux-android/21"
-          export CLANG_RES_PATH="$TOOLCHAIN/lib64/clang/12.0.8/lib/linux/aarch64"
-          
-          # Gunakan flag yang bersih, pastikan tidak ada variabel kosong
-          export RUSTFLAGS="-L $LIB_PATH -L $CLANG_RES_PATH"
-          
+          # Setup config cargo
           mkdir -p .cargo
           echo "[target.aarch64-linux-android]" > .cargo/config.toml
-          echo "linker = \"$TOOLCHAIN/bin/aarch64-linux-android21-clang\"" >> .cargo/config.toml
+          echo "linker = \"$TARGET_CC\"" >> .cargo/config.toml
 
-          cargo build --target aarch64-linux-android --release
+          # Kita gunakan cargo rustc untuk mempassing argumen linker secara paksa
+          # Kita tambahkan --nodefaultlibs dan secara manual melink yang diperlukan saja
+          # tanpa menyentuh -lunwind jika tidak diperlukan oleh NDK
+          cargo rustc --target aarch64-linux-android --release -- \
+            -C link-arg=-lc \
+            -C link-arg=-lm \
+            -C link-arg=-ldl \
+            -C link-arg=-landroid \
+            -C link-arg=-llog
 
           mkdir -p ../src/main/jniLibs/arm64-v8a
-          cp target/aarch64-linux-android/release/libtwoyi.so ../src/main/jniLibs/arm64-v8a/
+          # Pastikan nama file benar, terkadang di folder release namanya libtwoyi.so
+          cp target/aarch64-linux-android/release/libtwoyi.so ../src/main/jniLibs/arm64-v8a/ || \
+          cp target/release/libtwoyi.so ../src/main/jniLibs/arm64-v8a/
           
       - name: Build Android APK
         run: |
