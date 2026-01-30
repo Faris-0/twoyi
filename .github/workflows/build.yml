@@ -31,17 +31,13 @@ jobs:
           export TOOLCHAIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64
           export TARGET_CC=$TOOLCHAIN/bin/aarch64-linux-android21-clang
           
-          # TRIK: Buat library unwind palsu agar linker tidak protes
-          # NDK r22b sebenarnya sudah menyertakan fungsi unwind di dalam libgcc atau libc
           mkdir -p fake_libs
           ar rcs fake_libs/libunwind.a
           
-          # Setup config cargo
           mkdir -p .cargo
           echo "[target.aarch64-linux-android]" > .cargo/config.toml
           echo "linker = \"$TARGET_CC\"" >> .cargo/config.toml
 
-          # Tambahkan folder fake_libs ke dalam pencarian library
           export RUSTFLAGS="-L $(pwd)/fake_libs"
 
           cargo build --target aarch64-linux-android --release
@@ -51,11 +47,17 @@ jobs:
           
       - name: Build Android APK
         run: |
+          # Patch repo Aliyun (karena build.gradle kamu butuh ini untuk libp7zip)
+          sed -i "s|jcenter()|maven { url 'https://maven.aliyun.com/repository/public' }|g" build.gradle
+          
           chmod +x gradlew
-          ./gradlew assembleDebug -x :app:cargoBuild
+          # UBAH 1: Ganti assembleDebug ke assembleRelease
+          ./gradlew assembleRelease -x :app:cargoBuild
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Twoyi-Debug-APK
-          path: app/build/outputs/apk/debug/*.apk
+          # UBAH 2: Ganti nama artifact biar jelas
+          name: Twoyi-Release-Unsigned
+          # UBAH 3: Ganti path dari debug ke release
+          path: app/build/outputs/apk/release/*.apk
