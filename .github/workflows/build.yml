@@ -31,14 +31,15 @@ jobs:
           export TOOLCHAIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64
           export CC=$TOOLCHAIN/bin/aarch64-linux-android21-clang
           
-          # Cari lokasi libunwind.a secara otomatis di dalam NDK
-          export UNWIND_DIR=$(find $TOOLCHAIN -name "libunwind.a" -exec dirname {} \; | head -n 1)
-          echo "Found libunwind at: $UNWIND_DIR"
+          # Kita batasi find hanya mencari di folder aarch64 agar tidak tercampur 32-bit atau x86
+          export UNWIND_DIR=$(find $TOOLCHAIN -path "*/aarch64/*" -name "libunwind.a" -exec dirname {} \; | head -n 1)
+          echo "Found 64-bit libunwind at: $UNWIND_DIR"
           
-          # Cari lokasi crtbegin_so.o (untuk kelengkapan linking)
-          export CRT_DIR=$(find $TOOLCHAIN -name "crtbegin_so.o" -exec dirname {} \; | grep "21" | head -n 1)
+          # Cari crtbegin_so.o khusus untuk aarch64 dan API 21
+          export CRT_DIR=$TOOLCHAIN/sysroot/usr/lib/aarch64-linux-android/21
+          echo "Using CRT at: $CRT_DIR"
           
-          # Masukkan semua path ke RUSTFLAGS
+          # Set RUSTFLAGS hanya dengan jalur yang benar-benar 64-bit
           export RUSTFLAGS="-L $UNWIND_DIR -L $CRT_DIR"
 
           mkdir -p .cargo
