@@ -32,8 +32,8 @@ jobs:
         run: |
           cd app/rs
           export ANDROID_NATIVE_API_LEVEL=21
-          # Memaksa build hanya untuk 64-bit agar tidak error target std
-          cargo xdk build --targets arm64-v8a --release
+          # Pakai --target tunggal agar tidak bentrok dengan config internal Cargo.toml
+          cargo xdk build --target aarch64-linux-android --release
           
           mkdir -p ../src/main/jniLibs/arm64-v8a
           cp target/aarch64-linux-android/release/libtwoyi.so ../src/main/jniLibs/arm64-v8a/
