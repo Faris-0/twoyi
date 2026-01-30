@@ -31,25 +31,23 @@ jobs:
           export TOOLCHAIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64
           export TARGET_CC=$TOOLCHAIN/bin/aarch64-linux-android21-clang
           
+          # TRIK: Buat library unwind palsu agar linker tidak protes
+          # NDK r22b sebenarnya sudah menyertakan fungsi unwind di dalam libgcc atau libc
+          mkdir -p fake_libs
+          ar rcs fake_libs/libunwind.a
+          
           # Setup config cargo
           mkdir -p .cargo
           echo "[target.aarch64-linux-android]" > .cargo/config.toml
           echo "linker = \"$TARGET_CC\"" >> .cargo/config.toml
 
-          # Kita gunakan cargo rustc untuk mempassing argumen linker secara paksa
-          # Kita tambahkan --nodefaultlibs dan secara manual melink yang diperlukan saja
-          # tanpa menyentuh -lunwind jika tidak diperlukan oleh NDK
-          cargo rustc --target aarch64-linux-android --release -- \
-            -C link-arg=-lc \
-            -C link-arg=-lm \
-            -C link-arg=-ldl \
-            -C link-arg=-landroid \
-            -C link-arg=-llog
+          # Tambahkan folder fake_libs ke dalam pencarian library
+          export RUSTFLAGS="-L $(pwd)/fake_libs"
+
+          cargo build --target aarch64-linux-android --release
 
           mkdir -p ../src/main/jniLibs/arm64-v8a
-          # Pastikan nama file benar, terkadang di folder release namanya libtwoyi.so
-          cp target/aarch64-linux-android/release/libtwoyi.so ../src/main/jniLibs/arm64-v8a/ || \
-          cp target/release/libtwoyi.so ../src/main/jniLibs/arm64-v8a/
+          cp target/aarch64-linux-android/release/libtwoyi.so ../src/main/jniLibs/arm64-v8a/
           
       - name: Build Android APK
         run: |
