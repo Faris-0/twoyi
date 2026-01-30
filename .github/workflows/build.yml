@@ -29,22 +29,18 @@ jobs:
         run: |
           cd app/rs
           export TOOLCHAIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64
-          export CC=$TOOLCHAIN/bin/aarch64-linux-android21-clang
           
-          # Kita batasi find hanya mencari di folder aarch64 agar tidak tercampur 32-bit atau x86
-          export UNWIND_DIR=$(find $TOOLCHAIN -path "*/aarch64/*" -name "libunwind.a" -exec dirname {} \; | head -n 1)
-          echo "Found 64-bit libunwind at: $UNWIND_DIR"
+          # Kita langsung arahkan ke folder library 64-bit yang pasti ada di r22b
+          # Path ini adalah standar untuk NDK r22b ARM64
+          export LIB_PATH="$TOOLCHAIN/sysroot/usr/lib/aarch64-linux-android/21"
+          export CLANG_RES_PATH="$TOOLCHAIN/lib64/clang/12.0.8/lib/linux/aarch64"
           
-          # Cari crtbegin_so.o khusus untuk aarch64 dan API 21
-          export CRT_DIR=$TOOLCHAIN/sysroot/usr/lib/aarch64-linux-android/21
-          echo "Using CRT at: $CRT_DIR"
+          # Gunakan flag yang bersih, pastikan tidak ada variabel kosong
+          export RUSTFLAGS="-L $LIB_PATH -L $CLANG_RES_PATH"
           
-          # Set RUSTFLAGS hanya dengan jalur yang benar-benar 64-bit
-          export RUSTFLAGS="-L $UNWIND_DIR -L $CRT_DIR"
-
           mkdir -p .cargo
           echo "[target.aarch64-linux-android]" > .cargo/config.toml
-          echo "linker = \"$CC\"" >> .cargo/config.toml
+          echo "linker = \"$TOOLCHAIN/bin/aarch64-linux-android21-clang\"" >> .cargo/config.toml
 
           cargo build --target aarch64-linux-android --release
 
