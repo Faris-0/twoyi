@@ -10,11 +10,11 @@ use std::thread;
 use std::{io::Write};
 use uinput_sys::*;
 
-use std::sync::mpsc::{ channel, Sender};
+use std::sync::mpsc::{ SyncSender };
 use std::sync::Mutex;
 use once_cell::sync::Lazy;
 
-use log::info;
+use log::{info, error};
 
 const FF_MAX: u16 = 0x7f;
 
@@ -61,8 +61,8 @@ fn copy_to_cstr<const COUNT: usize>(data: &str, arr: &mut [u8; COUNT]) {
 
 const MAX_POINTERS: usize = 5;
 
-static INPUT_SENDER: Lazy<Mutex<Option<Sender<input_event>>>> = Lazy::new(|| { Mutex::new(None)});
-static KEY_SENDER: Lazy<Mutex<Option<Sender<input_event>>>> = Lazy::new(|| { Mutex::new(None)});
+static INPUT_SENDER: Lazy<Mutex<Option<SyncSender<input_event>>>> = Lazy::new(|| { Mutex::new(None)});
+static KEY_SENDER: Lazy<Mutex<Option<SyncSender<input_event>>>> = Lazy::new(|| { Mutex::new(None)});
 
 pub fn start_input_system(width: i32, height: i32) {
     thread::spawn(move || {
@@ -74,123 +74,76 @@ pub fn start_input_system(width: i32, height: i32) {
 }
 
 pub fn input_event_write(
-    tx: &std::sync::mpsc::Sender<input_event>,
+    tx: &std::sync::mpsc::SyncSender<input_event>, // Ubah Sender menjadi SyncSender
     kind: i32,
     code: i32,
     val: i32,
 ) {
     let mut tp = libc::timespec { tv_sec:0, tv_nsec: 0 };
-    let _ = unsafe { clock_gettime(CLOCK_MONOTONIC, &mut tp) };
-    let tv = timeval {
-        tv_sec: tp.tv_sec,
-        tv_usec: tp.tv_nsec / 1000
-    };
+    unsafe { libc::clock_gettime(libc::CLOCK_MONOTONIC, &mut tp) };
 
     let ev = input_event {
         kind: kind as u16,
         code: code as u16,
         value: val,
-        time: tv,
+        time: timeval {
+            tv_sec: tp.tv_sec,
+            tv_usec: (tp.tv_nsec / 1000) as i64,
+        },
     };
+
+    // GUNAKAN INI: Jangan biarkan input menumpuk jika client sedang sibuk
+    // Jika channel penuh atau error, abaikan saja (drop frame input)
     let _ = tx.send(ev);
 }
 
+// Di handle_touch, kita buat pengiriman event lebih "mandiri"
 pub fn handle_touch(ev: MotionEvent) {
-    let opt = INPUT_SENDER.lock().unwrap();
-    if let Some(ref fd) = *opt {
+    let action = ev.action();
+    let pointer_index = ev.pointer_index();
+    let pointer = ev.pointer_at_index(pointer_index);
+    let pointer_id = pointer.pointer_id();
+    let x = pointer.x();
+    let y = pointer.y();
+    let pressure = pointer.pressure();
 
-        let action = ev.action();
-        let pointer_index = ev.pointer_index();
-        let pointer = ev.pointer_at_index(pointer_index);
-        let pointer_id = pointer.pointer_id();
-        let pressure = pointer.pressure();
+    static G_INPUT_MT: Lazy<Mutex<[i32;MAX_POINTERS]>> = Lazy::new(|| {std::sync::Mutex::new([0i32;MAX_POINTERS])});
 
-        // info!("action: {:#?}, pointer_index: {}", action, pointer_index);
+    // Update state MT dalam scope kecil agar lock cepat dilepas
+    {
+        if let Ok(mut mt) = G_INPUT_MT.try_lock() {
+            match action {
+                MotionAction::Down | MotionAction::PointerDown => mt[pointer_id as usize] = 1,
+                MotionAction::Up | MotionAction::PointerUp | MotionAction::Cancel => mt[pointer_id as usize] = 0,
+                _ => (),
+            }
+        }
+    }
 
-        static G_INPUT_MT: Lazy<Mutex<[i32;MAX_POINTERS]>> = Lazy::new(|| {std::sync::Mutex::new([0i32;MAX_POINTERS])});
-
-        match action {
-            MotionAction::Down | MotionAction::PointerDown => {
-                let x = pointer.x();
-                let y = pointer.y();
-
-                let mut mt = G_INPUT_MT.lock().unwrap();
-                mt[pointer_id as usize] = 1;
-
-                let mut index = 0;
-                while index < MAX_POINTERS {
-                    if mt[index] != 0 {
-                        input_event_write(fd, EV_ABS, ABS_MT_SLOT, pointer_id);
-                        input_event_write(fd, EV_ABS, ABS_MT_TRACKING_ID, pointer_id + 1);
-
-                        if index == 0 {
-                            input_event_write(fd, EV_KEY, BTN_TOUCH, 108);
-                            input_event_write(fd, EV_KEY, BTN_TOOL_FINGER, 108);
-                        }
-
-                        input_event_write(fd, EV_ABS, ABS_MT_POSITION_X, x as i32);
-                        input_event_write(fd, EV_ABS, ABS_MT_POSITION_Y, y as i32);
-
-                        input_event_write(fd, EV_ABS, ABS_MT_PRESSURE, pressure as i32);
-
-                        input_event_write(fd, EV_SYN, SYN_REPORT, SYN_REPORT);
+    // KIRIM EVENT: Gunakan try_lock agar UI Thread TIDAK PERNAH menunggu (freeze)
+    if let Ok(sender_lock) = INPUT_SENDER.try_lock() {
+        if let Some(ref tx) = *sender_lock {
+            // Kita bungkus dalam closure atau blok untuk memastikan transmisi cepat
+            match action {
+                MotionAction::Down | MotionAction::PointerDown | MotionAction::Move => {
+                    input_event_write(tx, EV_ABS, ABS_MT_SLOT, pointer_id);
+                    if action != MotionAction::Move {
+                        input_event_write(tx, EV_ABS, ABS_MT_TRACKING_ID, pointer_id + 1);
+                        if pointer_id == 0 { input_event_write(tx, EV_KEY, BTN_TOUCH, 1); }
                     }
-                    index = index + 1;
-                }
+                    input_event_write(tx, EV_ABS, ABS_MT_POSITION_X, x as i32);
+                    input_event_write(tx, EV_ABS, ABS_MT_POSITION_Y, y as i32);
+                    input_event_write(tx, EV_ABS, ABS_MT_PRESSURE, pressure as i32);
+                    input_event_write(tx, EV_SYN, SYN_REPORT, 0);
+                },
+                MotionAction::Up | MotionAction::PointerUp | MotionAction::Cancel => {
+                    input_event_write(tx, EV_ABS, ABS_MT_SLOT, pointer_id);
+                    input_event_write(tx, EV_ABS, ABS_MT_TRACKING_ID, -1);
+                    if pointer_id == 0 { input_event_write(tx, EV_KEY, BTN_TOUCH, 0); }
+                    input_event_write(tx, EV_SYN, SYN_REPORT, 0);
+                },
+                _ => {}
             }
-            MotionAction::Up => {
-                // let x = pointer.x();
-                // let y = pointer.y();
-
-                let mut index = 0;
-                while index != MAX_POINTERS {
-                    let mut mt = G_INPUT_MT.lock().unwrap();
-                    if mt[index] != 0 {
-                        mt[index] = 0;
-                        input_event_write(fd, EV_ABS, ABS_MT_SLOT, index.try_into().unwrap());
-                        input_event_write(fd, EV_ABS, ABS_MT_TRACKING_ID, -1);
-                        input_event_write(fd, EV_SYN, SYN_REPORT, SYN_REPORT);
-                    }
-                    index = index + 1;
-                }
-            }
-            MotionAction::Move => {
-                let mut index = 0;
-
-                while index != MAX_POINTERS {
-                    let mt = G_INPUT_MT.lock().unwrap();
-                    if mt[index] != 0 {
-                        let x = pointer.x();
-                        let y = pointer.y();
-                        let pressure = pointer.pressure();
-
-                        input_event_write(fd, EV_ABS, ABS_MT_SLOT, index.try_into().unwrap());
-                        input_event_write(fd, EV_ABS, ABS_MT_POSITION_X, x as i32);
-                        input_event_write(fd, EV_ABS, ABS_MT_POSITION_Y, y as i32);
-
-                        input_event_write(fd, EV_ABS, ABS_MT_PRESSURE, pressure as i32);
-
-                        input_event_write(fd, EV_SYN, SYN_REPORT, SYN_REPORT);
-                    }
-
-                    index = index + 1;
-                }
-            }
-            MotionAction::Cancel | MotionAction::PointerUp => {
-                // let x = pointer.x();
-                // let y = pointer.y();
-
-                let mut mt = G_INPUT_MT.lock().unwrap();
-                if mt[pointer_id as usize] == 0 {
-                    return;
-                }
-
-                mt[pointer_id as usize] = 0;
-                input_event_write(fd, EV_ABS, ABS_MT_SLOT, pointer_id);
-                input_event_write(fd, EV_ABS, ABS_MT_TRACKING_ID, -1);
-                input_event_write(fd, EV_SYN, SYN_REPORT, SYN_REPORT);
-            }
-            _ => {}
         }
     }
 }
@@ -248,34 +201,59 @@ fn generate_touch_device(width: i32, height: i32) -> device_info {
 
 fn touch_server(width: i32, height: i32) {
     let device = generate_touch_device(width, height);
-    let _ = std::fs::remove_file(TOUCH_PATH);
-    let listener = unix_socket::UnixListener::bind(TOUCH_PATH).unwrap();
-    for stream in listener.incoming() {
-        match stream {
-            Ok(mut stream) => {
-                info!("touch client connected!");
 
+    loop {
+        let _ = std::fs::remove_file(TOUCH_PATH);
+        let listener = match unix_socket::UnixListener::bind(TOUCH_PATH) {
+            Ok(l) => l,
+            Err(_) => {
+                thread::sleep(std::time::Duration::from_millis(500));
+                continue;
+            }
+        };
+
+        unsafe {
+            if let Ok(path_cstr) = std::ffi::CString::new(TOUCH_PATH) {
+                libc::chmod(path_cstr.as_ptr(), 0o777);
+            }
+        }
+
+        for stream in listener.incoming() {
+            if let Ok(mut stream) = stream {
+                info!("Game input connected!");
+                let _ = stream.set_nonblocking(true);
                 let _ = stream.write_all(unsafe { any_as_u8_slice(&device) });
 
-                let (tx, rx) = channel::<input_event>();
-                *INPUT_SENDER.lock().unwrap() = Some(tx);
+                // Gunakan Sync Channel dengan limit kecil (misal 100 event)
+                // Ini mencegah penumpukan data yang bikin lag/freeze
+                let (tx, rx) = std::sync::mpsc::sync_channel::<input_event>(100);
 
-                thread::spawn(move || loop {
-                    let ret = rx.recv();
-                    if let Ok(ev) = ret {
-                        let data = unsafe { any_as_u8_slice(&ev) };
-                        let _ = stream.write_all(data);
+                {
+                    let mut sender_lock = INPUT_SENDER.lock().unwrap();
+                    *sender_lock = Some(tx);
+                }
+
+                loop {
+                    match rx.recv() {
+                        Ok(ev) => {
+                            let data = unsafe { any_as_u8_slice(&ev) };
+                            if let Err(e) = stream.write_all(data) {
+                                if e.kind() != std::io::ErrorKind::WouldBlock {
+                                    error!("Broken pipe, reconnecting...");
+                                    break;
+                                }
+                            }
+                        },
+                        Err(_) => break,
                     }
-                });
-            }
-            Err(_) => {
-                info!("touch server error happened!");
+                }
+                // Reset sender saat koneksi putus
+                let mut sender_lock = INPUT_SENDER.lock().unwrap();
+                *sender_lock = None;
                 break;
             }
         }
     }
-
-    info!("drop listener!");
 }
 
 fn generate_key_device() -> device_info {
@@ -312,14 +290,17 @@ fn key_server() {
 
                 let _ = stream.write_all(unsafe { any_as_u8_slice(&device) });
 
-                let (tx, rx) = channel::<input_event>();
+                // GANTI channel() menjadi sync_channel(10)
+                let (tx, rx) = std::sync::mpsc::sync_channel::<input_event>(10);
                 *KEY_SENDER.lock().unwrap() = Some(tx);
 
                 thread::spawn(move || loop {
                     let ret = rx.recv();
                     if let Ok(ev) = ret {
                         let data = unsafe { any_as_u8_slice(&ev) };
-                        let _ = stream.write_all(data);
+                        if let Err(_) = stream.write_all(data) { break; }
+                    } else {
+                        break;
                     }
                 });
             }

@@ -11,7 +11,8 @@ plugins {
 }
 
 android {
-    compileSdkVersion 31
+    namespace 'io.twoyi'
+    compileSdkVersion 34
     buildToolsVersion "30.0.3"
 
     def buildSerial = new SimpleDateFormat("MMddHHmm").format(new Date())
@@ -29,7 +30,6 @@ android {
         ndk {
             abiFilters "arm64-v8a"
         }
-        archivesBaseName = "twoyi_${versionName}"
     }
 
     buildTypes {
@@ -43,17 +43,28 @@ android {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
-}
-
-task cargoBuild {
-    doLast {
-        exec {
-            //切换到sh文件所在的目录，执行脚本
-            workingDir new File(project.projectDir, "rs")
-            //执行shell脚本 "," 传参
-            commandLine "sh", "build_rs.sh", "--release"
+    packaging {
+        jniLibs {
+            useLegacyPackaging true
         }
     }
+}
+
+afterEvaluate {
+    base {
+        archivesName = "twoyi_${android.defaultConfig.versionName}"
+    }
+}
+
+tasks.register('cargoBuild', Exec) {
+    // Menentukan lokasi folder rs
+    workingDir file("${projectDir}/rs")
+
+    // Perintah eksekusi
+    commandLine 'sh', 'build_rs.sh', '--release'
+
+    // Opsional: Agar tidak error jika sh tidak ditemukan di path tertentu
+    ignoreExitValue false
 }
 
 tasks.whenTaskAdded { task ->
@@ -87,7 +98,7 @@ dependencies {
     annotationProcessor 'androidx.annotation:annotation:1.3.0'
 
     implementation 'org.apache.commons:commons-compress:1.20'
-    implementation 'org.tukaani:xz:1.5'
+    implementation 'org.tukaani:xz:1.11'
 
     implementation 'com.hzy:libp7zip:1.7.0'
 //    implementation "com.github.seven332.a7zip:extract:master-SNAPSHOT"
