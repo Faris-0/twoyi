@@ -18,6 +18,7 @@ import com.bumptech.glide.load.model.ModelLoader;
 import com.bumptech.glide.signature.ObjectKey;
 
 class DrawableModelLoader implements ModelLoader<ApplicationInfo, Drawable> {
+
     private final Context mContext;
 
     DrawableModelLoader(Context context) {
@@ -27,9 +28,7 @@ class DrawableModelLoader implements ModelLoader<ApplicationInfo, Drawable> {
     @Nullable
     @Override
     public LoadData<Drawable> buildLoadData(@NonNull ApplicationInfo applicationInfo, int width, int height, @NonNull Options options) {
-
-        return new LoadData<>(new ObjectKey(applicationInfo),
-                new DrawableDataFetcher(mContext, applicationInfo));
+        return new LoadData<>(new ObjectKey(applicationInfo), new DrawableDataFetcher(mContext, applicationInfo));
     }
 
     @Override

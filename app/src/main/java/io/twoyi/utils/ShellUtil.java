@@ -19,8 +19,6 @@ public final class ShellUtil {
     }
 
     public static Shell newSh() {
-        return Shell.Builder.create()
-                .setFlags(Shell.FLAG_NON_ROOT_SHELL)
-                .build("sh");
+        return Shell.Builder.create().setFlags(Shell.FLAG_NON_ROOT_SHELL).build("sh");
     }
 }

@@ -6,7 +6,6 @@
 
 package io.twoyi.ui;
 
-import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
@@ -19,6 +18,7 @@ import android.view.View;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
 import java.util.Calendar;
@@ -247,7 +247,7 @@ public class AboutActivity extends AppCompatActivity {
 
         license.setOnClickListener(v -> {
             LicensesDialog licensesDialog = new LicensesDialog.Builder(AboutActivity.this)
-                    .setThemeResourceId(R.style.Theme_AppCompat_DayNight_Dialog_Alert)
+                    .setThemeResourceId(com.google.android.material.R.style.Theme_MaterialComponents_DayNight_Dialog_Alert)
                     .setNotices(notices)
                     .build();
             try {

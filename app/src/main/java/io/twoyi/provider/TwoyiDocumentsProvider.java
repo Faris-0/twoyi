@@ -31,9 +31,7 @@ import io.twoyi.utils.RomManager;
 public class TwoyiDocumentsProvider extends DocumentsProvider {
 
     private static final String ALL_MIME_TYPES = "*/*";
-
     private static final String DEFAULT_ROOT_ID = "0";
-
     private static final String[] DEFAULT_ROOT_PROJECTION = new String[]{
             Root.COLUMN_ROOT_ID,
             Root.COLUMN_MIME_TYPES,
@@ -44,7 +42,6 @@ public class TwoyiDocumentsProvider extends DocumentsProvider {
             Root.COLUMN_DOCUMENT_ID,
             Root.COLUMN_AVAILABLE_BYTES
     };
-
     private static final String[] DEFAULT_DOCUMENT_PROJECTION = new String[]{
             Document.COLUMN_DOCUMENT_ID,
             Document.COLUMN_MIME_TYPE,
@@ -56,7 +53,6 @@ public class TwoyiDocumentsProvider extends DocumentsProvider {
 
     @Override
     public Cursor queryRoots(String[] projection) {
-
         File BASE_DIR = RomManager.getRomSdcardDir(getContext());
 
         final MatrixCursor result = new MatrixCursor(projection != null ? projection : DEFAULT_ROOT_PROJECTION);
@@ -87,11 +83,7 @@ public class TwoyiDocumentsProvider extends DocumentsProvider {
         final MatrixCursor result = new MatrixCursor(projection != null ? projection : DEFAULT_DOCUMENT_PROJECTION);
         final File parent = getFileById(parentDocumentId);
         File[] files = parent.listFiles();
-        if (files != null) {
-            for (File file : files) {
-                includeFile(result, null, file);
-            }
-        }
+        if (files != null) for (File file : files) includeFile(result, null, file);
         return result;
     }
 
@@ -111,16 +103,11 @@ public class TwoyiDocumentsProvider extends DocumentsProvider {
     public String createDocument(String parentDocumentId, String mimeType, String displayName) throws FileNotFoundException {
         File newFile = new File(parentDocumentId, displayName);
         int noConflictId = 2;
-        while (newFile.exists()) {
-            newFile = new File(parentDocumentId, displayName + " (" + noConflictId++ + ")");
-        }
+        while (newFile.exists()) newFile = new File(parentDocumentId, displayName + " (" + noConflictId++ + ")");
         try {
             boolean succeeded;
-            if (Document.MIME_TYPE_DIR.equals(mimeType)) {
-                succeeded = newFile.mkdir();
-            } else {
-                succeeded = newFile.createNewFile();
-            }
+            if (Document.MIME_TYPE_DIR.equals(mimeType)) succeeded = newFile.mkdir();
+            else succeeded = newFile.createNewFile();
             if (!succeeded) {
                 throw new FileNotFoundException("Failed to create document: " + newFile.getPath());
             }
@@ -133,9 +120,7 @@ public class TwoyiDocumentsProvider extends DocumentsProvider {
     @Override
     public void deleteDocument(String documentId) throws FileNotFoundException {
         File file = getFileById(documentId);
-        if (!file.delete()) {
-            throw new FileNotFoundException("Failed to delete document:" + documentId);
-        }
+        if (!file.delete()) throw new FileNotFoundException("Failed to delete document:" + documentId);
     }
 
     @Override
@@ -146,9 +131,7 @@ public class TwoyiDocumentsProvider extends DocumentsProvider {
 
     @Override
     public boolean isChildDocument(String parentDocumentId, String documentId) {
-        if (parentDocumentId == null || documentId == null) {
-            return false;
-        }
+        if (parentDocumentId == null || documentId == null) return false;
         return documentId.startsWith(parentDocumentId);
     }
 
@@ -163,9 +146,8 @@ public class TwoyiDocumentsProvider extends DocumentsProvider {
     }
 
     private static String getMimeType(File file) {
-        if (file.isDirectory()) {
-            return Document.MIME_TYPE_DIR;
-        } else {
+        if (file.isDirectory()) return Document.MIME_TYPE_DIR;
+        else {
             final String name = file.getName();
             final int lastDot = name.lastIndexOf('.');
             if (lastDot >= 0) {
@@ -185,13 +167,9 @@ public class TwoyiDocumentsProvider extends DocumentsProvider {
         return getContext().getResources().getString(R.string.sdcard_of_twoyi);
     }
 
-    private void includeFile(MatrixCursor result, String docId, File file)
-            throws FileNotFoundException {
-        if (docId == null) {
-            docId = getDocId(file);
-        } else {
-            file = getFileById(docId);
-        }
+    private void includeFile(MatrixCursor result, String docId, File file) throws FileNotFoundException {
+        if (docId == null) docId = getDocId(file);
+        else file = getFileById(docId);
 
         int flags = 0;
         if (file.isDirectory()) {

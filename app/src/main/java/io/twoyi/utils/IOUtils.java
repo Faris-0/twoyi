@@ -36,24 +36,18 @@ public class IOUtils {
     public static void ensureCreated(File file) {
         if (!file.exists()) {
             boolean ret = file.mkdirs();
-            if (!ret) {
-                throw new RuntimeException("create dir: " + file + " failed");
-            }
+            if (!ret) throw new RuntimeException("create dir: " + file + " failed");
         }
     }
 
     public static boolean deleteDir(File dir) {
-        if (dir == null) {
-            return false;
-        }
+        if (dir == null) return false;
         boolean success = true;
         if (dir.isDirectory()) {
             String[] children = dir.list();
             for (String file : children) {
                 boolean ret = deleteDir(new File(dir, file));
-                if (!ret) {
-                    success = false;
-                }
+                if (!ret) success = false;
             }
             if (success) {
                 // if all subdirectory are deleted, delete the dir itself.
@@ -64,9 +58,7 @@ public class IOUtils {
     }
 
     public static void deleteAll(List<File> files) {
-        if (files.isEmpty()) {
-            return;
-        }
+        if (files.isEmpty()) return;
 
         for (File file : files) {
             //noinspection ResultOfMethodCallIgnored
@@ -87,8 +79,7 @@ public class IOUtils {
             while (true) {
                 buffer.clear();
                 int r = iChannel.read(buffer);
-                if (r == -1)
-                    break;
+                if (r == -1) break;
                 buffer.limit(buffer.position());
                 buffer.position(0);
                 oChannel.write(buffer);
@@ -100,9 +91,7 @@ public class IOUtils {
     }
 
     public static void closeSilently(Closeable closeable) {
-        if (closeable == null) {
-            return;
-        }
+        if (closeable == null) return;
         try {
             closeable.close();
         } catch (IOException e) {
@@ -122,9 +111,7 @@ public class IOUtils {
     }
 
     public static void writeContent(File file, String content) {
-        if (file == null || TextUtils.isEmpty(content)) {
-            return;
-        }
+        if (file == null || TextUtils.isEmpty(content)) return;
         FileWriter fileWriter = null;
         try {
             fileWriter = new FileWriter(file);
@@ -137,9 +124,7 @@ public class IOUtils {
     }
 
     public static String readContent(File file) {
-        if (file == null) {
-            return null;
-        }
+        if (file == null) return null;
         BufferedReader fileReader = null;
         try {
             fileReader = new BufferedReader(new FileReader(file));

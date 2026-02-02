@@ -26,10 +26,7 @@
             android:title="@string/settings_key_reboot" />
     </PreferenceCategory>
 
-
     <PreferenceCategory android:title="@string/settings_category_advanced">
-
-
         <Preference
             android:key="@string/settings_key_replace_rom"
             android:summary="@string/settings_replace_rom_summary"
@@ -39,12 +36,9 @@
             android:key="@string/settings_key_factory_reset"
             android:summary="@string/settings_factory_reset_summary"
             android:title="@string/settings_key_factory_reset" />
-
     </PreferenceCategory>
 
-
     <PreferenceCategory android:title="@string/settings_category_other">
-
         <Preference
             android:key="@string/settings_key_sendlog"
             android:summary="@string/settings_sendlog_summary"
@@ -59,5 +53,4 @@
             android:key="@string/settings_key_about"
             android:title="@string/settings_key_about" />
     </PreferenceCategory>
-
 </PreferenceScreen>

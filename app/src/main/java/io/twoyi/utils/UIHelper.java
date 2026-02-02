@@ -9,9 +9,7 @@ package io.twoyi.utils;
 import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.app.Dialog;
-import android.app.ProgressDialog;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.ComponentName;
@@ -25,12 +23,16 @@ import android.os.Process;
 import android.os.SystemClock;
 import android.text.TextUtils;
 import android.util.TypedValue;
+import android.view.LayoutInflater;
+import android.view.View;
 import android.webkit.WebView;
 import android.widget.Toast;
 
 import androidx.annotation.StringRes;
+import androidx.appcompat.app.AlertDialog;
 
 import com.afollestad.materialdialogs.MaterialDialog;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import org.jdeferred.android.AndroidDeferredManager;
 
@@ -110,7 +112,7 @@ public class UIHelper {
     }
 
     public static AlertDialog.Builder getDialogBuilder(Context context) {
-        AlertDialog.Builder builder = new AlertDialog.Builder(context, R.style.ThemeOverlay_MaterialComponents_MaterialAlertDialog);
+        AlertDialog.Builder builder = new AlertDialog.Builder(context, com.google.android.material.R.style.ThemeOverlay_MaterialComponents_MaterialAlertDialog);
         builder.setIcon(R.mipmap.ic_launcher);
         return builder;
     }
@@ -127,10 +129,17 @@ public class UIHelper {
         return dialogBuilder;
     }
 
-    public static ProgressDialog getProgressDialog(Context context) {
-        ProgressDialog dialog = new ProgressDialog(context);
+    public static AlertDialog getProgressDialog(Context context) {
+        View view = LayoutInflater.from(context).inflate(R.layout.layout_progress, null);
+
+        AlertDialog dialog = new MaterialAlertDialogBuilder(context)
+                .setView(view)
+                .setCancelable(false)
+                .create();
+
         dialog.setIcon(R.mipmap.ic_launcher);
-        dialog.setTitle(R.string.progress_dialog_title);
+        //dialog.setTitle(R.string.progress_dialog_title);
+
         return dialog;
     }
 

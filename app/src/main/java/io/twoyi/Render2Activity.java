@@ -132,7 +132,6 @@ public class Render2Activity extends Activity implements View.OnTouchListener {
         UITips.checkForAndroid12(this, this::bootSystem);
 
         mSurfaceView.setOnTouchListener(this);
-
     }
 
     @Override
@@ -179,21 +178,15 @@ public class Render2Activity extends Activity implements View.OnTouchListener {
     private void showTipsForFirstBoot() {
         mLoadingText.setText(R.string.extracting_tips);
         mRootView.postDelayed(() -> {
-            if (mIsExtracting.get()) {
-                mLoadingText.setText(R.string.first_boot_tips);
-            }
+            if (mIsExtracting.get()) mLoadingText.setText(R.string.first_boot_tips);
         }, 5000);
 
         mRootView.postDelayed(() -> {
-            if (mIsExtracting.get()) {
-                mLoadingText.setText(R.string.first_boot_tips2);
-            }
+            if (mIsExtracting.get()) mLoadingText.setText(R.string.first_boot_tips2);
         }, 10 * 1000);
 
         mRootView.postDelayed(() -> {
-            if (mIsExtracting.get()) {
-                mLoadingText.setText(R.string.first_boot_tips3);
-            }
+            if (mIsExtracting.get()) mLoadingText.setText(R.string.first_boot_tips3);
         }, 15 * 1000);
     }
 
@@ -202,26 +195,23 @@ public class Render2Activity extends Activity implements View.OnTouchListener {
         mLoadingText.setVisibility(View.GONE);
         mBootLogView.setVisibility(View.VISIBLE);
         new Thread(() -> {
+            boolean success = false;
+            try {
+                success = TwoyiStatusManager.getInstance().waitBoot(15, TimeUnit.SECONDS);
+            } catch (Throwable ignored) {
+            }
 
-            if (true) {
-                boolean success = false;
-                try {
-                    success = TwoyiStatusManager.getInstance().waitBoot(15, TimeUnit.SECONDS);
-                } catch (Throwable ignored) {
-                }
+            if (!success) {
+                LogEvents.trackBootFailure(getApplicationContext());
 
-                if (!success) {
-                    LogEvents.trackBootFailure(getApplicationContext());
+                runOnUiThread(() -> Toast.makeText(getApplicationContext(), R.string.boot_failed, Toast.LENGTH_SHORT).show());
 
-                    runOnUiThread(() -> Toast.makeText(getApplicationContext(), R.string.boot_failed, Toast.LENGTH_SHORT).show());
+                // waiting for track
+                SystemClock.sleep(3000);
 
-                    // waiting for track
-                    SystemClock.sleep(3000);
-
-                    finish();
-                    System.exit(0);
-                    return;
-                }
+                finish();
+                System.exit(0);
+                return;
             }
 
             runOnUiThread(() -> {
@@ -235,9 +225,7 @@ public class Render2Activity extends Activity implements View.OnTouchListener {
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
 
-        if (hasFocus) {
-            NavUtils.hideNavigation(getWindow());
-        }
+        if (hasFocus) NavUtils.hideNavigation(getWindow());
 
         // Update global visibility.
         TwoyiStatusManager.getInstance().updateVisibility(hasFocus);

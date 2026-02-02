@@ -13,10 +13,10 @@
         android:shortcutShortLabel="@string/title_settings">
 
         <categories android:name="android.shortcut.conversation" />
+
         <intent
             android:action="android.intent.action.VIEW"
             android:targetClass="io.twoyi.ui.SettingsActivity"
             android:targetPackage="io.twoyi" />
     </shortcut>
-
 </shortcuts>

@@ -49,15 +49,10 @@ import java.util.TimeZone;
 public final class RomManager {
 
     private static final String TAG = "RomManager";
-
     private static final String ROOTFS_NAME = "rootfs.7z";
-
     private static final String ROM_INFO_FILE = "rom.ini";
-
     private static final String DEFAULT_INFO = "unknown";
-
     private static final String LOADER_FILE = "libloader.so";
-
     private static final String CUSTOM_ROM_FILE_NAME = "rootfs_3rd.7z";
 
     private RomManager() {
@@ -87,7 +82,6 @@ public final class RomManager {
     }
 
     public static void ensureBootFiles(Context context) {
-
         // <rootdir>/dev/
         File devDir = new File(getRootfsDir(context), "dev");
         ensureDir(new File(devDir, "input"));
@@ -129,6 +123,7 @@ public final class RomManager {
     }
 
     public static class RomInfo {
+
         public String author = DEFAULT_INFO;
         public String version = DEFAULT_INFO;
         public String desc = DEFAULT_INFO;
@@ -160,9 +155,7 @@ public final class RomManager {
     public static boolean needsUpgrade(Context context) {
         RomInfo currentRomInfo = getCurrentRomInfo(context);
         Log.i(TAG, "current rom: " + currentRomInfo);
-        if (currentRomInfo.equals(DEFAULT_ROM_INFO)) {
-            return true;
-        }
+        if (currentRomInfo.equals(DEFAULT_ROM_INFO)) return true;
 
         RomInfo romInfoFromAssets = getRomInfoFromAssets(context);
         Log.i(TAG, "asset rom: " + romInfoFromAssets);
@@ -185,9 +178,7 @@ public final class RomManager {
 
     public static RomInfo getRomInfo(File rom) {
         try (SevenZFile zFile = new SevenZFile(rom)) {
-
             SevenZArchiveEntry entry;
-
             while ((entry = zFile.getNextEntry()) != null) {
                 if (entry.getName().equals("rootfs/rom.ini")) {
                     byte[] content = new byte[(int) entry.getSize()];
@@ -212,7 +203,6 @@ public final class RomManager {
     }
 
     public static void extractRootfs(Context context, boolean romExist, boolean needsUpgrade, boolean forceInstall, boolean use3rdRom) {
-
         // force remove system dir to avoiding wired issues
         removeSystemPartition(context);
         removeVendorPartition(context);
@@ -242,14 +232,10 @@ public final class RomManager {
             // force install finish, reset the state.
             AppKV.setBooleanConfig(context, AppKV.FORCE_ROM_BE_RE_INSTALL, false);
         } else {
-            if (use3rdRom) {
-                Log.w(TAG, "WTF? 3rd ROM must be force install!");
-            }
+            if (use3rdRom) Log.w(TAG, "WTF? 3rd ROM must be force install!");
             if (needsUpgrade) {
                 Log.i(TAG, "upgrade factory rom..");
-                if (!extractRootfsInAssets(context)) {
-                    showRootfsInstallationFailure(context);
-                }
+                if (!extractRootfsInAssets(context)) showRootfsInstallationFailure(context);
             }
         }
     }
@@ -272,32 +258,24 @@ public final class RomManager {
 
     public static boolean extract3rdRootfs(Context context) {
         File rootfs3rd = get3rdRootfsFile(context);
-        if (!rootfs3rd.exists()) {
-            return false;
-        }
+        if (!rootfs3rd.exists()) return false;
         int err = extractRootfs(context, rootfs3rd);
         return err == 0;
     }
 
     public static int extractRootfs(Context context, File rootfs7z) {
-
         int cpu = Runtime.getRuntime().availableProcessors();
-        return P7ZipApi.executeCommand(String.format(Locale.US, "7z x -mmt=%d -aoa '%s' '-o%s'",
-                cpu, rootfs7z, context.getDataDir()));
+        return P7ZipApi.executeCommand(String.format(Locale.US, "7z x -mmt=%d -aoa '%s' '-o%s'", cpu, rootfs7z, context.getDataDir()));
     }
 
     public static boolean extractRootfsInAssets(Context context) {
-
         // read assets
         long t1 = SystemClock.elapsedRealtime();
         File rootfs7z = context.getFileStreamPath(ROOTFS_NAME);
-        try (InputStream inputStream = new BufferedInputStream(context.getAssets().open(ROOTFS_NAME));
-             OutputStream os = new BufferedOutputStream(new FileOutputStream(rootfs7z))) {
+        try (InputStream inputStream = new BufferedInputStream(context.getAssets().open(ROOTFS_NAME)); OutputStream os = new BufferedOutputStream(new FileOutputStream(rootfs7z))) {
             byte[] buffer = new byte[10240];
             int count;
-            while ((count = inputStream.read(buffer)) > 0) {
-                os.write(buffer, 0, count);
-            }
+            while ((count = inputStream.read(buffer)) > 0) os.write(buffer, 0, count);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -370,9 +348,7 @@ public final class RomManager {
     }
 
     private static void ensureDir(File file) {
-        if (file.exists()) {
-            return;
-        }
+        if (file.exists()) return;
         //noinspection ResultOfMethodCallIgnored
         file.mkdirs();
     }

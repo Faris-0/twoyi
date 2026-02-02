@@ -11,25 +11,21 @@ plugins {
 }
 
 android {
-    compileSdkVersion 31
-    buildToolsVersion "30.0.3"
+    namespace 'io.twoyi'
+    compileSdkVersion 36
 
     def buildSerial = new SimpleDateFormat("MMddHHmm").format(new Date())
 
     defaultConfig {
         applicationId "io.twoyi"
-        minSdkVersion 27
-        //noinspection ExpiredTargetSdkVersion
-        targetSdkVersion 27
+        minSdkVersion 28
+        targetSdkVersion 28
         versionCode 10354
         versionName "0.5.4-${buildSerial}"
-
-        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
             abiFilters "arm64-v8a"
         }
-        archivesBaseName = "twoyi_${versionName}"
     }
 
     buildTypes {
@@ -39,67 +35,69 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+    buildFeatures {
+        resValues true
     }
-}
-
-task cargoBuild {
-    doLast {
-        exec {
-            //切换到sh文件所在的目录，执行脚本
-            workingDir new File(project.projectDir, "rs")
-            //执行shell脚本 "," 传参
-            commandLine "sh", "build_rs.sh", "--release"
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    packaging {
+        jniLibs {
+            useLegacyPackaging true
         }
     }
+    ndkVersion '22.1.7171670'
 }
 
-tasks.whenTaskAdded { task ->
-    if ((task.name == 'javaPreCompileDebug' || task.name == 'javaPreCompileRelease')) {
-        task.dependsOn 'cargoBuild'
+afterEvaluate {
+    base {
+        archivesName = "twoyi_${android.defaultConfig.versionName}"
     }
+}
+
+tasks.register('cargoBuild', Exec) {
+    workingDir file("${projectDir}/rs")
+    Properties properties = new Properties()
+    properties.load(project.rootProject.file('local.properties').newDataInputStream())
+    def ndkPath = "${properties.getProperty('sdk.dir')}/ndk/${android.ndkVersion}"
+    environment "ANDROID_NDK_HOME", ndkPath
+    environment "NDK_HOME", ndkPath
+    commandLine 'sh', 'build_rs.sh', '--release'
+}
+
+tasks.configureEach { task ->
+    if ((task.name == 'javaPreCompileDebug' || task.name == 'javaPreCompileRelease')) task.dependsOn 'cargoBuild'
 }
 
 dependencies {
 
-    implementation 'androidx.appcompat:appcompat:1.3.1'
-    implementation 'com.google.android.material:material:1.4.0'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.13.0'
 
     implementation 'com.github.tiann:FreeReflection:3.1.0'
 
-    def libsuVersion = '3.2.1'
-    implementation "com.github.topjohnwu.libsu:core:${libsuVersion}"
+    implementation "com.github.topjohnwu.libsu:core:6.0.0"
 
     // AboutPage
     implementation 'com.github.medyo:android-about-page:1.2.4'
-    implementation 'de.psdev.licensesdialog:licensesdialog:1.9.0'
-    implementation 'com.afollestad.material-dialogs:core:0.9.6.0'
+    implementation 'de.psdev.licensesdialog:licensesdialog:2.2.0'
+    implementation 'com.afollestad.material-dialogs:core:0.9.6.0' // com.android.support:support-annotations:27.0.1
     implementation 'moe.feng:AlipayZeroSdk:1.1'
 
-    implementation 'org.jdeferred:jdeferred-android-aar:1.2.4'
+    implementation 'org.jdeferred:jdeferred-android-aar:1.2.6'
     implementation 'com.github.clans:fab:1.6.4'
 
-    //noinspection GradleDependency
-    implementation ('com.github.bumptech.glide:glide:4.9.0')
-    annotationProcessor 'com.github.bumptech.glide:compiler:4.9.0'
-    annotationProcessor 'androidx.annotation:annotation:1.3.0'
+    implementation 'com.github.bumptech.glide:glide:4.16.0'
+    annotationProcessor 'com.github.bumptech.glide:compiler:4.16.0'
+    annotationProcessor 'androidx.annotation:annotation:1.9.1'
 
-    implementation 'org.apache.commons:commons-compress:1.20'
-    implementation 'org.tukaani:xz:1.5'
+    implementation 'org.apache.commons:commons-compress:1.28.0'
+    implementation 'org.tukaani:xz:1.11'
 
     implementation 'com.hzy:libp7zip:1.7.0'
-//    implementation "com.github.seven332.a7zip:extract:master-SNAPSHOT"
-//    implementation 'com.github.omicronapps:7-Zip-JBinding-4Android:Release-16.02-2.02'
-//    implementation 'com.victor:lib:1.0.4'
-    implementation 'com.cleveroad:androidmanimation:0.9.1'
+    implementation 'com.cleveroad:androidmanimation:0.9.1' // com.android.support:appcompact-v7:23.2.0
 
-    def appCenterSdkVersion = '4.3.1'
-    implementation "com.microsoft.appcenter:appcenter-analytics:${appCenterSdkVersion}"
-    implementation "com.microsoft.appcenter:appcenter-crashes:${appCenterSdkVersion}"
-
-//    testImplementation 'junit:junit:4.+'
-    androidTestImplementation 'androidx.test.ext:junit:1.1.1'
-    androidTestImplementation 'androidx.test.espresso:espresso-core:3.3.0'
+    implementation 'com.intuit.sdp:sdp-android:1.1.1'
+    implementation 'com.intuit.ssp:ssp-android:1.1.1'
 }

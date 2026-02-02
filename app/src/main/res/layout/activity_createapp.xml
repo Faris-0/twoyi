@@ -23,7 +23,7 @@
             android:layout_weight="1"
             android:gravity="center"
             android:textColor="@color/textPrimary"
-            android:textSize="18sp"
+            android:textSize="@dimen/_13ssp"
             android:visibility="gone" />
 
         <ListView
@@ -39,13 +39,13 @@
             android:id="@+id/create_app_btn"
             style="@android:style/Widget.Material.Button"
             android:layout_width="match_parent"
-            android:layout_height="48dp"
+            android:layout_height="@dimen/_38sdp"
             android:layout_gravity="bottom|center"
             android:background="@color/colorPrimary"
             android:foreground="?android:attr/selectableItemBackground"
             android:text="@string/select_app_button"
             android:textColor="@android:color/white"
-            android:textSize="18sp"
+            android:textSize="@dimen/_13ssp"
             tools:ignore="HardcodedText" />
     </LinearLayout>
 
@@ -54,8 +54,8 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|end"
-        android:layout_marginRight="40dp"
-        android:layout_marginBottom="100dp"
+        android:layout_marginEnd="@dimen/_30sdp"
+        android:layout_marginBottom="@dimen/_78sdp"
         android:contentDescription="@string/import_app_from_file"
         android:src="@drawable/ic_add"
         app:fabSize="normal"

@@ -24,11 +24,10 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
 import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.FileProvider;
 import androidx.core.util.Pair;
-
-import com.microsoft.appcenter.crashes.Crashes;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -183,7 +182,7 @@ public class SettingsActivity extends AppCompatActivity {
                 try {
                     Files.write(tmpLog.toPath(), bugreport);
                 } catch (IOException e) {
-                    Crashes.trackError(e);
+                    LogEvents.trackError(e);
                 }
                 Uri uri = FileProvider.getUriForFile(context, "io.twoyi.fileprovider", tmpLog);
 
@@ -222,8 +221,7 @@ public class SettingsActivity extends AppCompatActivity {
             }
 
             Activity activity = getActivity();
-            ProgressDialog dialog = UIHelper.getProgressDialog(activity);
-            dialog.setCancelable(false);
+            AlertDialog dialog = UIHelper.getProgressDialog(activity);
             dialog.show();
 
             // start copy 3rd rom

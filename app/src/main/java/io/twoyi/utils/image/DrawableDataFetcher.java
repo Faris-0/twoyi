@@ -21,7 +21,6 @@ public class DrawableDataFetcher implements DataFetcher<Drawable> {
     private final ApplicationInfo mModel;
     private final Context mContext;
 
-
     DrawableDataFetcher(Context context, ApplicationInfo model) {
         mModel = model;
         mContext = context;

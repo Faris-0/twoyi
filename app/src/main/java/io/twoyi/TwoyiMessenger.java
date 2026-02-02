@@ -31,12 +31,10 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class TwoyiMessenger {
+
     public static final String TAG = "TwoyiMessenger";
-
     public static final String SWITCH_HOST = "SWITCH_HOST";
-
     public static final String PING = "PING";
-
     private static final String SOCK_NAME = "TWOYI_SOCK";
 
     private volatile OutputStreamWriter mWriter;
@@ -51,10 +49,8 @@ public class TwoyiMessenger {
         this.mLock = new ReentrantReadWriteLock();
     }
 
-    public TwoyiMessenger connect() {
-        if (this.socket != null) {
-            return this;
-        }
+    public void connect() {
+        if (this.socket != null) return;
 
         try {
             this.socket = new LocalSocket(LocalSocket.SOCKET_SEQPACKET);
@@ -65,36 +61,21 @@ public class TwoyiMessenger {
         } catch (IOException e) {
             e.printStackTrace();
         }
-        return this;
     }
 
     public static synchronized TwoyiMessenger getInstance() {
-        if (TwoyiMessenger.INSTANCE == null) {
-            TwoyiMessenger.INSTANCE = new TwoyiMessenger();
-        }
-
+        if (TwoyiMessenger.INSTANCE == null) TwoyiMessenger.INSTANCE = new TwoyiMessenger();
         return TwoyiMessenger.INSTANCE;
     }
 
     public void send(String msg) {
-
-        if (Looper.getMainLooper() == Looper.myLooper()) {
-            EXECUTOR.execute(new Runnable() {
-                @Override
-                public void run() {
-                    write(msg);
-                }
-            });
-        } else {
-            this.write(msg);
-        }
+        if (Looper.getMainLooper() == Looper.myLooper()) EXECUTOR.execute(() -> write(msg));
+        else this.write(msg);
     }
 
     private void write(String msg) {
         synchronized (this) {
-            if (mWriter == null) {
-                connect();
-            }
+            if (mWriter == null) connect();
         }
 
         try {
@@ -107,4 +88,3 @@ public class TwoyiMessenger {
         }
     }
 }
-

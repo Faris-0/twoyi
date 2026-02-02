@@ -29,7 +29,6 @@ public class Installer {
 
     public interface InstallResult {
         void onSuccess(List<File> files);
-
         void onFail(List<File> files, String msg);
     }
 
@@ -46,7 +45,6 @@ public class Installer {
     }
 
     public static void install(Context context, List<File> files, InstallResult callback) {
-
 //        Shell.enableVerboseLogging = true;
 
         String nativeLibraryDir = context.getApplicationInfo().nativeLibraryDir;
@@ -75,11 +73,11 @@ public class Installer {
 
         boolean connected = false;
         for (String s : result.getOut()) {
-
             // connected to localhost:22122
             // already connected to localhost
             if (s.contains("connected to")) {
                 connected = true;
+                break;
             }
         }
 
@@ -89,23 +87,18 @@ public class Installer {
         }
 
         if (!connected) {
-            if (callback != null) {
-                callback.onFail(files, "Adb connect failed!");
-            }
+            if (callback != null) callback.onFail(files, "Adb connect failed!");
             return;
         }
 
         StringBuilder sb = new StringBuilder();
-        for (File file : files) {
-            sb.append(file.getAbsolutePath()).append(" ");
-        }
+        for (File file : files) sb.append(file.getAbsolutePath()).append(" ");
 
         String fileArgs = sb.toString();
 
         String installCommand;
-        if (files.size() == 1) {
-            installCommand = String.format(Locale.US, "%s -P %d -s %s install -t -r %s", adbPath, ADB_PORT, connectTarget, fileArgs);
-        } else {
+        if (files.size() == 1) installCommand = String.format(Locale.US, "%s -P %d -s %s install -t -r %s", adbPath, ADB_PORT, connectTarget, fileArgs);
+        else {
             // http://aospxref.com/android-10.0.0_r47/xref/system/core/adb/client/adb_install.cpp#447
             installCommand = String.format(Locale.US, "%s -P %d -s %s install-multiple -t -r %s", adbPath, ADB_PORT, connectTarget, fileArgs);
         }
@@ -117,12 +110,9 @@ public class Installer {
         installShell.newJob().add(envCmd).add(installCommand).to(new ArrayList<>(), new ArrayList<>()).submit(out1 -> {
             Log.w(TAG, "install result: " + out1.isSuccess());
 
-            if (callback == null) {
-                return;
-            }
-            if (out1.isSuccess()) {
-                callback.onSuccess(files);
-            } else {
+            if (callback == null) return;
+            if (out1.isSuccess()) callback.onSuccess(files);
+            else {
                 String msg = Arrays.toString(out1.getErr().toArray(new String[0]));
                 Log.w(TAG, "msg: " + msg);
 
@@ -139,22 +129,16 @@ public class Installer {
                 break;
             }
         }
-
         return valid;
     }
 
     public static boolean checkFile(Context context, String path) {
-        if (path == null) {
-            return false;
-        }
+        if (path == null) return false;
 
         PackageManager pm = context.getPackageManager();
-        if (pm == null) {
-            return false;
-        }
+        if (pm == null) return false;
 
         PackageInfo packageInfo = pm.getPackageArchiveInfo(path, 0);
-
         if (packageInfo == null) {
             Toast.makeText(context.getApplicationContext(), R.string.check_file_invlid_apk, Toast.LENGTH_SHORT).show();
             return false;

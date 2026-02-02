@@ -141,14 +141,11 @@ public class BootLogTexture extends TextureView implements TextureView.SurfaceTe
 
     @Override
     public void onSurfaceTextureAvailable(@NonNull SurfaceTexture surface, int width, int height) {
-
         Shell.EXECUTOR.execute(() -> {
             List<String> callbackList = new CallbackList<String>() {
                 @Override
                 public void onAddElement(String s) {
-                    if (TextUtils.isEmpty(s)) {
-                        return;
-                    }
+                    if (TextUtils.isEmpty(s)) return;
                     synchronized (mLogMessages) {
                         mLogMessages.add(s);
                     }
@@ -167,7 +164,6 @@ public class BootLogTexture extends TextureView implements TextureView.SurfaceTe
                 shell.waitAndClose(1, TimeUnit.SECONDS);
             } catch (Throwable ignored) {
             }
-
         });
     }
 
@@ -204,22 +200,15 @@ public class BootLogTexture extends TextureView implements TextureView.SurfaceTe
 
             int count = 0;
             for (String log : mSnapShot) {
-
                 char chr = log.charAt(0);
 
                 Paint paint = mPaints.get(chr);
-                if (paint == null) {
-                    paint = mDefaultPaint;
-                }
+                if (paint == null) paint = mDefaultPaint;
 
                 canvas.drawText(log, 0, count++ * 20, paint);
             }
-
         } finally {
-            if (canvas != null) {
-                unlockCanvasAndPost(canvas);
-            }
+            if (canvas != null) unlockCanvasAndPost(canvas);
         }
-
     }
 }

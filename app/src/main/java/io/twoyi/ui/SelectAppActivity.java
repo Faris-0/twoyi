@@ -7,7 +7,6 @@
 package io.twoyi.ui;
 
 import android.app.Activity;
-import android.app.ProgressDialog;
 import android.content.ClipData;
 import android.content.ContentResolver;
 import android.content.Context;
@@ -36,9 +35,12 @@ import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.SearchView;
 import androidx.core.widget.CompoundButtonCompat;
@@ -76,10 +78,7 @@ import io.twoyi.utils.image.GlideModule;
 public class SelectAppActivity extends AppCompatActivity {
 
     private static final String TAG = "SelectAppActivity";
-
-    private static final int REQUEST_GET_FILE = 1;
-
-    private static int TAG_KEY = R.id.create_app_list;
+    private static final int TAG_KEY = R.id.create_app_list;
 
     private ListAppAdapter mAdapter;
     private final List<AppItem> mDisplayItems = new ArrayList<>();
@@ -88,6 +87,52 @@ public class SelectAppActivity extends AppCompatActivity {
     private TextView mEmptyView;
 
     private final Set<String> specifiedPackages = new HashSet<>();
+
+    private final ActivityResultLauncher<Intent> getFileLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            result -> {
+                if (result.getResultCode() == Activity.RESULT_OK && result.getData() != null) {
+                    handleFilePickerResult(result.getData());
+                }
+            }
+    );
+
+    private void handleFilePickerResult(Intent data) {
+        ClipData clipData = data.getClipData();
+        List<Uri> fileUris = new ArrayList<>();
+
+        if (clipData == null) {
+            // single file
+            if (data.getData() != null) fileUris.add(data.getData());
+        } else {
+            // multiple files
+            for (int i = 0; i < clipData.getItemCount(); i++) fileUris.add(clipData.getItemAt(i).getUri());
+        }
+
+        if (fileUris.isEmpty()) {
+            Toast.makeText(getApplicationContext(), R.string.select_app_app_not_found, Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        AlertDialog dialog = UIHelper.getProgressDialog(this);
+        dialog.show();
+
+        // start copy and install
+        UIHelper.defer().when(() -> {
+                    List<File> files = copyFilesFromUri(fileUris);
+                    for (File f : files) Log.d(TAG, "Temp file created: " + f.getAbsolutePath() + " size: " + f.length());
+                    boolean allValid = Installer.checkFile(getApplicationContext(), files);
+                    if (!allValid) {
+                        IOUtils.deleteAll(files);
+                        throw new RuntimeException("invalid apk file!");
+                    }
+                    return files;
+                }).done(result -> startInstall(result, dialog, true))
+                .fail(err -> runOnUiThread(() -> {
+                    Toast.makeText(getApplicationContext(), getResources().getString(R.string.install_failed_reason, err.getMessage()), Toast.LENGTH_SHORT).show();
+                    dialog.dismiss();
+                }));
+    }
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -110,24 +155,18 @@ public class SelectAppActivity extends AppCompatActivity {
             intent.setType("application/vnd.android.package-archive"); // apk file
             intent.addCategory(Intent.CATEGORY_OPENABLE);
             try {
-                startActivityForResult(intent, REQUEST_GET_FILE);
+                getFileLauncher.launch(intent);
             } catch (Throwable ignored) {
                 Toast.makeText(getApplicationContext(), "Error", Toast.LENGTH_SHORT).show();
             }
         });
 
-
         TextView createApp = findViewById(R.id.create_app_btn);
         createApp.setBackgroundResource(R.color.colorPrimary);
         createApp.setText(R.string.select_app_button);
         createApp.setOnClickListener((v) -> {
-
             Set<AppItem> selectedApps = new HashSet<>();
-            for (AppItem displayItem : mDisplayItems) {
-                if (displayItem.selected) {
-                    selectedApps.add(displayItem);
-                }
-            }
+            for (AppItem displayItem : mDisplayItems) if (displayItem.selected) selectedApps.add(displayItem);
             if (selectedApps.isEmpty()) {
                 Toast.makeText(this, R.string.select_app_tips, Toast.LENGTH_SHORT).show();
                 return;
@@ -157,12 +196,8 @@ public class SelectAppActivity extends AppCompatActivity {
             }
         }
 
-        if (true) {
-            int size = specifiedPackages.size();
-            if (size > 1) {
-                specifiedPackages.clear();
-            }
-        }
+        int size = specifiedPackages.size();
+        if (size > 1) specifiedPackages.clear();
 
         loadAsync();
 
@@ -170,16 +205,13 @@ public class SelectAppActivity extends AppCompatActivity {
     }
 
     private void selectComplete(Set<AppItem> pkgs) {
-
         if (pkgs.size() != 1) {
-
             // TODO: support install mutilpe apps together
             Toast.makeText(getApplicationContext(), R.string.please_install_one_by_one, Toast.LENGTH_SHORT).show();
             return;
         }
 
-        ProgressDialog progressDialog = UIHelper.getProgressDialog(this);
-        progressDialog.setCancelable(false);
+        AlertDialog progressDialog = UIHelper.getProgressDialog(this);
         progressDialog.show();
 
         for (AppItem pkg : pkgs) {
@@ -191,11 +223,7 @@ public class SelectAppActivity extends AppCompatActivity {
             apks.add(new File(sourceDir));
 
             String[] splitSourceDirs = applicationInfo.splitSourceDirs;
-            if (splitSourceDirs != null) {
-                for (String splitSourceDir : splitSourceDirs) {
-                    apks.add(new File(splitSourceDir));
-                }
-            }
+            if (splitSourceDirs != null) for (String splitSourceDir : splitSourceDirs) apks.add(new File(splitSourceDir));
 
             startInstall(apks, progressDialog, false);
         }
@@ -203,10 +231,9 @@ public class SelectAppActivity extends AppCompatActivity {
 
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
-        switch (item.getItemId()) {
-            case android.R.id.home:
-                onBackPressed();
-                return true;
+        if (item.getItemId() == android.R.id.home) {
+            getOnBackPressedDispatcher().onBackPressed();
+            return true;
         }
         return super.onOptionsItemSelected(item);
     }
@@ -226,7 +253,6 @@ public class SelectAppActivity extends AppCompatActivity {
         searchView.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
         // 为searchView添加事件
         searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
-
             // 输入后点击回车改变文本
             @Override
             public boolean onQueryTextSubmit(String query) {
@@ -254,7 +280,7 @@ public class SelectAppActivity extends AppCompatActivity {
         return super.onCreateOptionsMenu(menu);
     }
 
-    private MenuItem setFilterMenuItem(Menu menu, int id, String key, boolean defalutValue) {
+    private void setFilterMenuItem(Menu menu, int id, String key, boolean defalutValue) {
         MenuItem menuItem = menu.findItem(id);
         menuItem.setChecked(AppKV.getBooleanConfig(getApplicationContext(), key, defalutValue));
 
@@ -271,7 +297,6 @@ public class SelectAppActivity extends AppCompatActivity {
 
             return true;
         });
-        return menuItem;
     }
 
     private void filterListByText(String query) {
@@ -284,82 +309,18 @@ public class SelectAppActivity extends AppCompatActivity {
 
         List<AppItem> newApps = new ArrayList<>();
         Set<CharSequence> pkgs = new HashSet<>();
-        for (AppItem mAllApp : mAllApps) {
-            pkgs.add(mAllApp.pkg);
-        }
+        for (AppItem mAllApp : mAllApps) pkgs.add(mAllApp.pkg);
 
         for (AppItem appItem : mAllApps) {
             String name = appItem.name.toString().toLowerCase();
             String pkg = appItem.pkg.toString().toLowerCase();
             String queryLower = query.toLowerCase();
-            if (name.contains(queryLower) || pkg.contains(queryLower)) {
-                newApps.add(appItem);
-            }
-            if (appItem.selected && !pkgs.contains(appItem.pkg)) {
-                newApps.add(appItem);
-            }
+            if (name.contains(queryLower) || pkg.contains(queryLower)) newApps.add(appItem);
+            if (appItem.selected && !pkgs.contains(appItem.pkg)) newApps.add(appItem);
         }
         mDisplayItems.clear();
         mDisplayItems.addAll(newApps);
         notifyDataSetChangedWithSort();
-    }
-
-    @Override
-    public void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (!(requestCode == REQUEST_GET_FILE && resultCode == Activity.RESULT_OK)) {
-            return;
-        }
-
-        if (data == null) {
-            return;
-        }
-
-        ClipData clipData = data.getClipData();
-        List<Uri> fileUris = new ArrayList<>();
-        if (clipData == null) {
-            // single file
-            fileUris.add(data.getData());
-        } else {
-            // multiple file
-            int itemCount = clipData.getItemCount();
-            for (int i = 0; i < itemCount; i++) {
-                ClipData.Item item = clipData.getItemAt(i);
-                Uri uri = item.getUri();
-                fileUris.add(uri);
-            }
-        }
-
-        if (fileUris.isEmpty()) {
-            Toast.makeText(getApplicationContext(), R.string.select_app_app_not_found, Toast.LENGTH_SHORT).show();
-            return;
-
-        }
-
-        ProgressDialog dialog = UIHelper.getProgressDialog(this);
-        dialog.setCancelable(false);
-        dialog.show();
-
-        // start copy and install
-        UIHelper.defer().when(() -> {
-            List<File> files = copyFilesFromUri(fileUris);
-
-            Log.i(TAG, "files copied: " + files);
-
-            boolean allValid = Installer.checkFile(getApplicationContext(), files);
-            if (!allValid) {
-                IOUtils.deleteAll(files);
-                throw new RuntimeException("invalid apk file!");
-            }
-
-            return files;
-        }).done(result -> startInstall(result, dialog, false))
-                .fail(result -> runOnUiThread(() -> {
-                    Toast.makeText(getApplicationContext(), getResources().getString(R.string.install_failed_reason, result.getMessage()), Toast.LENGTH_SHORT).show();
-                    dialog.dismiss();
-                    finish();
-                }));
-
     }
 
     private List<File> copyFilesFromUri(List<Uri> fileUris) {
@@ -372,26 +333,21 @@ public class SelectAppActivity extends AppCompatActivity {
             try (InputStream inputStream = contentResolver.openInputStream(uri); OutputStream os = new FileOutputStream(tmpFile)) {
                 byte[] buffer = new byte[1024];
                 int count;
-                while ((count = inputStream.read(buffer)) > 0) {
-                    os.write(buffer, 0, count);
-                }
+                while ((count = inputStream.read(buffer)) > 0) os.write(buffer, 0, count);
             } catch (IOException e) {
                 LogEvents.trackError(e);
                 continue;
             }
-
             files.add(tmpFile);
         }
         return files;
     }
 
-    private void startInstall(List<File> result, ProgressDialog dialog, boolean cleanFile) {
+    private void startInstall(List<File> result, AlertDialog dialog, boolean cleanFile) {
         Installer.installAsync(getApplicationContext(), result, new Installer.InstallResult() {
             @Override
             public void onSuccess(List<File> files) {
-                if (cleanFile) {
-                    IOUtils.deleteAll(files);
-                }
+                if (cleanFile) IOUtils.deleteAll(files);
 
                 runOnUiThread(() -> {
                     Toast.makeText(getApplicationContext(), R.string.install_success, Toast.LENGTH_SHORT).show();
@@ -402,9 +358,7 @@ public class SelectAppActivity extends AppCompatActivity {
 
             @Override
             public void onFail(List<File> files, String msg) {
-                if (cleanFile) {
-                    IOUtils.deleteAll(files);
-                }
+                if (cleanFile) IOUtils.deleteAll(files);
 
                 runOnUiThread(() -> {
                     Toast.makeText(getApplicationContext(), getResources().getString(R.string.install_failed_reason, msg), Toast.LENGTH_SHORT).show();
@@ -416,7 +370,6 @@ public class SelectAppActivity extends AppCompatActivity {
     }
 
     private void loadAsync() {
-
         mEmptyView.setText(null);
 
         mDisplayItems.clear();
@@ -425,23 +378,20 @@ public class SelectAppActivity extends AppCompatActivity {
         UIHelper.show(progressDialog);
 
         // 是否从别的地方过来的，这种情况下不做任何过滤。
-        boolean specified = specifiedPackages.size() > 0;
+        boolean specified = !specifiedPackages.isEmpty();
         AtomicBoolean specifiedFound = new AtomicBoolean(false);
 
         long start = SystemClock.elapsedRealtime();
         UIHelper.defer().when(() -> {
             PackageManager packageManager = getPackageManager();
-            if (packageManager == null) {
-                return Collections.<AppItem>emptyList();
-            }
+            if (packageManager == null) return Collections.<AppItem>emptyList();
             List<ApplicationInfo> apps = packageManager.getInstalledApplications(PackageManager.GET_META_DATA);
 
             runOnUiThread(() -> progressDialog.setMaxProgress(apps.size()));
 
             List<AppItem> appItems = new ArrayList<>();
             int mask = ApplicationInfo.FLAG_SYSTEM | ApplicationInfo.FLAG_UPDATED_SYSTEM_APP;
-            PackageInfo sys = packageManager.getPackageInfo(
-                    "android", PackageManager.GET_SIGNATURES);
+            PackageInfo sys = packageManager.getPackageInfo("android", PackageManager.GET_SIGNING_CERTIFICATES);
 
             boolean directlyAdd = true;
 
@@ -452,9 +402,7 @@ public class SelectAppActivity extends AppCompatActivity {
                 // 自己忽略
                 runOnUiThread(() -> progressDialog.incrementProgress(1));
 
-                if (TextUtils.equals(getPackageName(), app.packageName)) {
-                    continue;
-                }
+                if (TextUtils.equals(getPackageName(), app.packageName)) continue;
 
                 // 检查系统应用
                 boolean isSystemApp = (app.flags & mask) != 0 || isSystemApp(packageManager, app.packageName, sys);
@@ -471,11 +419,7 @@ public class SelectAppActivity extends AppCompatActivity {
                     }
                 }
 
-                if (no32BitApps) {
-                    if (!UIHelper.isAppSupport64bit(app)) {
-                        continue;
-                    }
-                }
+                if (no32BitApps) if (!UIHelper.isAppSupport64bit(app)) continue;
 
                 AppItem appItem = new AppItem();
 
@@ -491,15 +435,14 @@ public class SelectAppActivity extends AppCompatActivity {
                 appItems.add(appItem);
             }
 
-            if (apps.size() == 0) {
+            if (apps.isEmpty()) {
                 // 压根没有应用列表，那么说明没有权限
                 mEmptyView.setText(R.string.create_app_no_apps);
-            } else if (appItems.size() == 0) {
+            } else if (appItems.isEmpty()) {
                 // 所有APP都被添加完毕了
                 mEmptyView.setText(R.string.create_app_all_apps_added);
             }
             return appItems;
-
         }).done((v) -> {
             mAllApps.clear();
             mAllApps.addAll(v);
@@ -520,7 +463,7 @@ public class SelectAppActivity extends AppCompatActivity {
     }
 
     private void notifyDataSetChangedWithSort() {
-        Collections.sort(mDisplayItems, (o1, o2) -> {
+        mDisplayItems.sort((o1, o2) -> {
             int w1 = o1.selected ? 1 : 0;
             int w2 = o2.selected ? 1 : 0;
             return w2 - w1;
@@ -556,29 +499,24 @@ public class SelectAppActivity extends AppCompatActivity {
 
         @Override
         public View getView(int position, View convertView, ViewGroup parent) {
-
             ViewHolder holder;
             if (convertView == null) {
                 holder = new ViewHolder(SelectAppActivity.this, parent);
                 convertView = holder.root;
                 convertView.setTag(holder);
-            } else {
-                holder = (ViewHolder) convertView.getTag();
-            }
+            } else holder = (ViewHolder) convertView.getTag();
 
             AppItem item = getItem(position);
 
             holder.icon.setColorFilter(colorFilter);
 
             int[][] states = {{android.R.attr.state_checked}, {}};
-            int[] colors = {getResources().getColor(R.color.colorPrimary),
-                    getResources().getColor(android.R.color.tab_indicator_text)};
+            int[] colors = {getResources().getColor(R.color.colorPrimary), getResources().getColor(android.R.color.tab_indicator_text)};
             CompoundButtonCompat.setButtonTintList(holder.checkBox, new ColorStateList(states, colors));
 
             GlideModule.loadApplicationIcon(getApplicationContext(), item.applicationInfo, holder.icon);
             holder.label.setText(item.name);
-            String pkg = String.format(Locale.US, "%s [ API %d %s]", item.pkg, item.applicationInfo.targetSdkVersion,
-                    item.applicationInfo.splitPublicSourceDirs != null ? "S" : "");
+            String pkg = String.format(Locale.US, "%s [ API %d %s]", item.pkg, item.applicationInfo.targetSdkVersion, item.applicationInfo.splitPublicSourceDirs != null ? "S" : "");
 
             holder.pkg.setText(pkg);
 
@@ -594,9 +532,7 @@ public class SelectAppActivity extends AppCompatActivity {
         @Override
         public void onClick(View v) {
             Object tag = v.getTag(TAG_KEY);
-            if (!(tag instanceof Integer)) {
-                return;
-            }
+            if (!(tag instanceof Integer)) return;
             int position = (int) tag;
 
             mSelectItem = mDisplayItems.get(position);
@@ -604,20 +540,18 @@ public class SelectAppActivity extends AppCompatActivity {
             boolean is64Bit = UIHelper.isApk64(mSelectItem.applicationInfo.sourceDir);
 
             if (!is64Bit) {
-
                 Toast.makeText(getApplicationContext(), R.string.unsupported_for_32bit_app, Toast.LENGTH_SHORT).show();
                 return;
             }
 
-            for (int i = 0; i < mDisplayItems.size(); i++) {
-                mDisplayItems.get(i).selected = position == i;
-            }
+            for (int i = 0; i < mDisplayItems.size(); i++) mDisplayItems.get(i).selected = position == i;
 
             notifyDataSetChanged();
         }
     }
 
     static class ViewHolder {
+
         ImageView icon;
         TextView label;
         TextView pkg;
@@ -632,10 +566,10 @@ public class SelectAppActivity extends AppCompatActivity {
             pkg = root.findViewById(R.id.item_app_package);
             checkBox = root.findViewById(R.id.item_checkbox);
         }
-
     }
 
     private static class AppItem {
+
         private ApplicationInfo applicationInfo;
         private CharSequence name;
         private CharSequence pkg;
@@ -653,30 +587,15 @@ public class SelectAppActivity extends AppCompatActivity {
     public static boolean isSystemApp(PackageManager packageManager, String packageName, PackageInfo sys) {
         try {
             // Get packageinfo for target application
-            PackageInfo targetPkgInfo = packageManager.getPackageInfo(
-                    packageName, PackageManager.GET_SIGNATURES);
+            PackageInfo targetPkgInfo = packageManager.getPackageInfo(packageName, PackageManager.GET_SIGNING_CERTIFICATES);
             // Get packageinfo for system package
             // Match both packageinfo for there signatures
-            return (targetPkgInfo != null && targetPkgInfo.signatures != null && sys.signatures[0]
-                    .equals(targetPkgInfo.signatures[0]));
+            if (targetPkgInfo != null && targetPkgInfo.signingInfo != null && sys.signingInfo != null) {
+                return sys.signingInfo.getApkContentsSigners()[0].equals(targetPkgInfo.signingInfo.getApkContentsSigners()[0]);
+            }
         } catch (PackageManager.NameNotFoundException e) {
-            return false;
+            Log.e("Installer", "Package not found: " + packageName);
         }
-    }
-
-    public static boolean isSystemApp(Context context, String packageName) {
-
-        if (context == null || packageName == null) {
-            return false;
-        }
-
-        try {
-            PackageManager packageManager = context.getPackageManager();
-            PackageInfo sys = packageManager.getPackageInfo(
-                    "android", PackageManager.GET_SIGNATURES);
-            return isSystemApp(packageManager, packageName, sys);
-        } catch (PackageManager.NameNotFoundException e) {
-            return false;
-        }
+        return false;
     }
 }

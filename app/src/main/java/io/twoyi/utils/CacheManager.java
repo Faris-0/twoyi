@@ -22,13 +22,9 @@ public class CacheManager {
 
     public static ACache getLabelCache(Context context) {
         synchronized (LABEL_LOCK) {
-            if (sLabelCache != null) {
-                return sLabelCache;
-            }
+            if (sLabelCache != null) return sLabelCache;
             Context appContext = context.getApplicationContext();
-            if (appContext == null) {
-                appContext = context;
-            }
+            if (appContext == null) appContext = context;
 
             sLabelCache = ACache.get(appContext, "labelCache");
             return sLabelCache;
@@ -37,15 +33,10 @@ public class CacheManager {
 
     public static String getLabel(Context context, ApplicationInfo info, PackageManager pm) {
         PackageManager packageManager;
-        if (pm != null) {
-            packageManager = pm;
-        } else {
-            packageManager = context.getPackageManager();
-        }
+        if (pm != null) packageManager = pm;
+        else packageManager = context.getPackageManager();
 
-        if (info == null) {
-            return null;
-        }
+        if (info == null) return null;
 
         String key = info.packageName;
         ACache labelCache = getLabelCache(context);

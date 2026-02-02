@@ -31,6 +31,7 @@ import io.twoyi.utils.LogEvents;
 public class TwoyiStatusManager {
 
     private static final TwoyiStatusManager INSTANCE = new TwoyiStatusManager();
+
     private TwoyiStatusManager() {
     }
 
@@ -76,17 +77,13 @@ public class TwoyiStatusManager {
     }
 
     public void switchOs(Context context) {
-        if (!mStarted.get()) {
-            return;
-        }
+        if (!mStarted.get()) return;
 
         Intent intent;
         if (mShown.get()) {
             intent = new Intent(Intent.ACTION_MAIN);
             intent.addCategory(Intent.CATEGORY_HOME);
-        } else {
-            intent = new Intent(context, Render2Activity.class);
-        }
+        } else intent = new Intent(context, Render2Activity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
 
         context.startActivity(intent);

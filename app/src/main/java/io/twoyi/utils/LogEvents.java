@@ -9,9 +9,7 @@ package io.twoyi.utils;
 import android.content.Context;
 import android.content.pm.PackageInfo;
 import android.os.Build;
-
-import com.microsoft.appcenter.crashes.Crashes;
-import com.microsoft.appcenter.crashes.ingestion.models.ErrorAttachmentLog;
+import android.util.Log;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -33,29 +31,33 @@ import java.util.zip.ZipOutputStream;
 
 public class LogEvents {
 
-    private static final RuntimeException BOOT_FAILURE = new RuntimeException("BootFailureException");
+    private static final String TAG = "LogEvents";
+    private static final RuntimeException BOOT_FAILURE_EXCEPTION = new RuntimeException("BootFailureException") {
+        @Override
+        public synchronized Throwable fillInStackTrace() {
+            return this;
+        }
+    };
 
     public static void trackError(Throwable e) {
-        Crashes.trackError(e);
+        Log.e(TAG, "Error tracked", e);
     }
-    public static void trackError(Throwable e, Map<String, String> properties, Iterable<ErrorAttachmentLog> attachments) {
-        Crashes.trackError(e, properties, attachments);
+
+    public static void trackError(Throwable e, Map<String, String> properties) {
+        Log.e(TAG, "Error with properties: " + properties, e);
     }
 
     public static void trackBootFailure(Context context) {
-
         Map<String, String> properties = new HashMap<>();
         RomManager.RomInfo info = RomManager.getCurrentRomInfo(context);
+        if (info != null) {
+            properties.put("rom_ver", String.valueOf(info.code));
+            properties.put("rom_author", info.author);
+            properties.put("rom_md5", info.md5);
+        }
 
-        properties.put("rom_ver", String.valueOf(info.code));
-        properties.put("rom_author", info.author);
-        properties.put("rom_md5", info.md5);
-
-        List<ErrorAttachmentLog> errors = new ArrayList<>();
-
-        errors.add(ErrorAttachmentLog.attachmentWithBinary(getBugreport(context), "bugreport.zip", "application/zip"));
-
-        trackError(BOOT_FAILURE, properties, errors);
+        Log.i(TAG, "Tracking boot failure. Bug report generation can be triggered if needed.");
+        trackError(BOOT_FAILURE_EXCEPTION, properties);
     }
 
     public static File getLogcatFile(Context context) {

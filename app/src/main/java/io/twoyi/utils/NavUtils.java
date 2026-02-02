@@ -24,32 +24,21 @@ public class NavUtils {
     }
 
     public static void isNavigationBarExist(Activity activity, final OnNavigationStateListener onNavigationStateListener) {
-        if (activity == null) {
-            return;
-        }
+        if (activity == null) return;
         final int height = getNavigationHeight(activity);
 
         activity.getWindow().getDecorView().setOnApplyWindowInsetsListener((v, windowInsets) -> {
-            boolean isShowing = false;
-            int b = 0;
-            if (windowInsets != null) {
-                b = windowInsets.getSystemWindowInsetBottom();
-                isShowing = (b == height);
-            }
-            if (onNavigationStateListener != null && b <= height) {
-                onNavigationStateListener.onNavigationState(isShowing, b);
-            }
+            int b = windowInsets.getSystemWindowInsetBottom();
+            boolean isShowing = (b == height);
+            if (onNavigationStateListener != null && b <= height) onNavigationStateListener.onNavigationState(isShowing, b);
             return windowInsets;
         });
     }
 
     public static int getNavigationHeight(Context activity) {
-        if (activity == null) {
-            return 0;
-        }
+        if (activity == null) return 0;
         Resources resources = activity.getResources();
-        int resourceId = resources.getIdentifier("navigation_bar_height",
-                "dimen", "android");
+        int resourceId = resources.getIdentifier("navigation_bar_height", "dimen", "android");
         int height = 0;
         if (resourceId > 0) {
             //获取NavigationBar的高度

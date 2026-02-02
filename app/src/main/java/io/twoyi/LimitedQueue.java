@@ -21,6 +21,7 @@ package io.twoyi;
 import java.util.LinkedList;
 
 public class LimitedQueue<E> extends LinkedList<E> {
+
     private int limit;
 
     public LimitedQueue(int limit) {

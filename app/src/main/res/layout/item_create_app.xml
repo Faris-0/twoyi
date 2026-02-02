@@ -8,18 +8,17 @@
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="56dp"
+    android:layout_height="@dimen/_45sdp"
     android:background="?android:attr/selectableItemBackground"
     android:focusable="true">
 
-
     <ImageView
         android:id="@+id/item_app_icon"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
+        android:layout_width="@dimen/_30sdp"
+        android:layout_height="@dimen/_30sdp"
         android:layout_alignParentStart="true"
         android:layout_centerVertical="true"
-        android:layout_marginStart="10dp"
+        android:layout_marginStart="@dimen/_8sdp"
         tools:src="@mipmap/ic_launcher" />
 
     <LinearLayout
@@ -34,18 +33,19 @@
             android:id="@+id/item_app_name"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="10dp"
-            android:layout_marginBottom="5dp"
+            android:layout_marginStart="@dimen/_8sdp"
+            android:layout_marginBottom="@dimen/_3sdp"
             android:gravity="center|start"
+            android:textSize="@dimen/_11ssp"
             tools:text="App Label" />
 
         <TextView
             android:id="@+id/item_app_package"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="10dp"
+            android:layout_marginStart="@dimen/_8sdp"
             android:gravity="center|start"
-            android:textSize="12sp"
+            android:textSize="@dimen/_10ssp"
             tools:text="App Label" />
     </LinearLayout>
 
@@ -53,8 +53,7 @@
         android:id="@+id/item_checkbox"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginRight="12dp"
+        android:layout_marginEnd="@dimen/_10sdp"
         android:layout_alignParentEnd="true"
         android:layout_centerVertical="true" />
-
 </RelativeLayout>

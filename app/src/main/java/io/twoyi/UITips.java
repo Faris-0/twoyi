@@ -20,16 +20,15 @@ import io.twoyi.utils.UIHelper;
 public class UITips {
 
     /**
-     * @param activity the context
+     * @param activity     the context
      * @param bootCallback 不是 Android 12 或者用户点了确认时触发的回调
-     * @return 返回 true 代表不是 Android 12，或者允许用户启动
      */
-    public static boolean checkForAndroid12(Activity activity, Runnable bootCallback) {
+    public static void checkForAndroid12(Activity activity, Runnable bootCallback) {
         boolean showTips = AppKV.getBooleanConfig(activity, AppKV.SHOW_ANDROID12_TIPS, true);
 
         if (!RomManager.isAndroid12() || !showTips) {
             bootCallback.run();
-            return true;
+            return;
         }
 
         UIHelper.getDialogBuilder(activity)
@@ -48,8 +47,6 @@ public class UITips {
                     confirmForAndroid12(activity, bootCallback);
                 })
                 .show();
-
-        return false;
     }
 
     private static void confirmForAndroid12(Activity activity, Runnable callback) {
@@ -64,9 +61,7 @@ public class UITips {
                     AppKV.setBooleanConfig(activity, AppKV.SHOW_ANDROID12_TIPS, false);
 
                     // 点不再展示才开始启动系统
-                    if (callback != null) {
-                        callback.run();
-                    }
+                    if (callback != null) callback.run();
                 })))
                 .setNegativeButton(R.string.look_it, (dialog12, which12) -> {
                     UIHelper.visitSite(activity, "https://twoyi.app/guide/android-12.html");

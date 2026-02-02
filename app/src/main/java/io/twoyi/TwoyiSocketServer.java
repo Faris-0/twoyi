@@ -64,10 +64,7 @@ public class TwoyiSocketServer {
     }
 
     public static TwoyiSocketServer getInstance(Context context) {
-        if (INSTANCE == null) {
-            INSTANCE = new TwoyiSocketServer(context);
-        }
-
+        if (INSTANCE == null) INSTANCE = new TwoyiSocketServer(context);
         return INSTANCE;
     }
 
@@ -76,7 +73,6 @@ public class TwoyiSocketServer {
             EXECUTOR.submit(this::start0);
 
             EXECUTOR.submit(()-> {
-
                 // some device restrict local socket, just connect it to prompt the permission dialog.
                 SystemClock.sleep(3000);
 
@@ -107,7 +103,6 @@ public class TwoyiSocketServer {
             SystemClock.sleep(1000);
 
             start();
-
         } finally {
             IOUtils.closeSilently(socket);
         }
@@ -127,7 +122,6 @@ public class TwoyiSocketServer {
                 int read = inputStream.read(data);
                 handleData(new String(data, 0, read, StandardCharsets.US_ASCII));
             }
-
         } catch (IOException ignored) {
         }
     }
