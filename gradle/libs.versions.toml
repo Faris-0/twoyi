@@ -1,0 +1,45 @@
+
+[versions]
+appcompat = "1.6.1"
+material = "1.13.0"
+freeReflection = "3.1.0"
+libsu = "6.0.0"
+androidAboutPage = "1.2.4"
+licensesDialog = "2.2.0"
+materialDialogs = "0.9.6.0"
+alipayZeroSdk = "1.1"
+jdeferred = "1.2.6"
+fab = "1.6.4"
+glide = "4.16.0"
+annotation = "1.9.1"
+commonsCompress = "1.28.0"
+xz = "1.11"
+libp7zip = "1.7.0"
+androidmAnimation = "0.9.1"
+sdp = "1.1.1"
+ssp = "1.1.1"
+agp = "9.0.0"
+
+[libraries]
+androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
+material = { group = "com.google.android.material", name = "material", version.ref = "material" }
+freeReflection = { group = "com.github.tiann", name = "FreeReflection", version.ref = "freeReflection" }
+libsu-core = { group = "com.github.topjohnwu.libsu", name = "core", version.ref = "libsu" }
+android-about-page = { group = "com.github.medyo", name = "android-about-page", version.ref = "androidAboutPage" }
+licensesdialog = { group = "de.psdev.licensesdialog", name = "licensesdialog", version.ref = "licensesDialog" }
+material-dialogs-core = { group = "com.afollestad.material-dialogs", name = "core", version.ref = "materialDialogs" }
+alipay-zero-sdk = { group = "moe.feng", name = "AlipayZeroSdk", version.ref = "alipayZeroSdk" }
+jdeferred-android-aar = { group = "org.jdeferred", name = "jdeferred-android-aar", version.ref = "jdeferred" }
+fab = { group = "com.github.clans", name = "fab", version.ref = "fab" }
+glide = { group = "com.github.bumptech.glide", name = "glide", version.ref = "glide" }
+glide-compiler = { group = "com.github.bumptech.glide", name = "compiler", version.ref = "glide" }
+androidx-annotation = { group = "androidx.annotation", name = "annotation", version.ref = "annotation" }
+commons-compress = { group = "org.apache.commons", name = "commons-compress", version.ref = "commonsCompress" }
+xz = { group = "org.tukaani", name = "xz", version.ref = "xz" }
+libp7zip = { group = "com.hzy", name = "libp7zip", version.ref = "libp7zip" }
+androidmanimation = { group = "com.cleveroad", name = "androidmanimation", version.ref = "androidmAnimation" }
+sdp-android = { group = "com.intuit.sdp", name = "sdp-android", version.ref = "sdp" }
+ssp-android = { group = "com.intuit.ssp", name = "ssp-android", version.ref = "ssp" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
