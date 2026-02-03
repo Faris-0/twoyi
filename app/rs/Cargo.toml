@@ -10,11 +10,11 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-libc = "0.2"
-once_cell = "1.19"
+libc = "0.2.180"
+once_cell = "1.21.3"
 
 # for log
-log = "0.4"
+log = "0.4.29"
 android_logger = "0.15.1"
 
 ndk = "0.9.0"
@@ -25,9 +25,9 @@ jni = { version = "0.21.1", default-features = false }
 uinput-sys = "0.1.7"
 unix_socket = "0.5.0"
 
-parking_lot = "0.12"
-tokio = { version = "1", features = ["rt-multi-thread", "net", "sync", "io-util"] }
-anyhow = "1.0"
+parking_lot = "0.12.5"
+tokio = { version = "1.49.0", features = ["rt-multi-thread", "net", "sync", "io-util"] }
+anyhow = "1.0.100"
 
 [patch.crates-io]
 uinput-sys = { git = 'https://github.com/tiann/rust-uinput-sys' }

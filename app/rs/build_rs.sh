@@ -7,4 +7,4 @@
 #
 
 cargo clean
-cargo xdk -t arm64-v8a -o ../src/main/jniLibs build $1
+cargo ndk -t arm64-v8a -o ../src/main/jniLibs build $1

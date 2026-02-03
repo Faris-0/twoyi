@@ -35,8 +35,7 @@ fn setup_permissions() -> Result<(), std::io::Error> {
     let path = "/data/data/io.twoyi/rootfs/dev/input";
     for entry in fs::read_dir(path)? {
         let path = entry?.path();
-        let meta = fs::metadata(&path)?;
-        if meta.permissions().mode() != 0o777 {
+        if fs::metadata(&path)?.permissions().mode() != 0o777 {
             fs::set_permissions(&path, fs::Permissions::from_mode(0o777))?;
         }
     }

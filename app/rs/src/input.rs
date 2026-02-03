@@ -2,14 +2,13 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-use libc::*;
-use libc::{c_char, c_int};
+use libc::{c_char, c_int, timeval, timespec, clock_gettime, CLOCK_MONOTONIC};
 use ndk::event::{MotionAction, MotionEvent};
 use parking_lot::Mutex;
 use std::mem;
 use std::thread;
-use std::{io::Write};
-use uinput_sys::*;
+use std::io::Write;
+use uinput_sys::{input_event, input_id, EV_KEY, EV_ABS, EV_SYN, SYN_REPORT, ABS_MT_SLOT, ABS_MT_POSITION_X, ABS_MT_POSITION_Y, ABS_MT_PRESSURE, ABS_MT_TRACKING_ID, BTN_TOUCH, KEY_MAX, ABS_MAX, REL_MAX, SW_MAX, LED_MAX, INPUT_PROP_MAX, ABS_CNT, INPUT_PROP_BUTTONPAD};
 use tokio::net::UnixListener;
 use tokio::io::AsyncWriteExt;
 use std::sync::mpsc::SyncSender;
@@ -20,12 +19,12 @@ use anyhow::{Result, anyhow};
 const KEY_BACK: i32 = 158;
 const KEY_ENTER: i32 = 28;
 const FF_MAX: u16 = 0x7f;
-const TOUCH_PATH: &'static str = "/data/data/io.twoyi/rootfs/dev/input/touch";
-const TOUCH_DEVICE_NAME: &'static str = "vtouch";
-const TOUCH_DEVICE_UNIQUE_ID: &'static str = "<vtouch 0>";
-const KEY_DEVICE_NAME: &'static str = "vkey";
-const KEY_DEVICE_UNIQUE_ID: &'static str = "<keyboard 0>";
-const KEY_PATH: &'static str = "/data/data/io.twoyi/rootfs/dev/input/key0";
+const TOUCH_PATH: &str = "/data/data/io.twoyi/rootfs/dev/input/touch";
+const TOUCH_DEVICE_NAME: &str = "vtouch";
+const TOUCH_DEVICE_UNIQUE_ID: &str = "<vtouch 0>";
+const KEY_DEVICE_NAME: &str = "vkey";
+const KEY_DEVICE_UNIQUE_ID: &str = "<keyboard 0>";
+const KEY_PATH: &str = "/data/data/io.twoyi/rootfs/dev/input/key0";
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -55,7 +54,8 @@ fn copy_to_cstr<const COUNT: usize>(data: &str, arr: &mut [u8; COUNT]) {
     let bytes = cstr.as_bytes_with_nul();
     let mut len = bytes.len();
     if len >= COUNT { len = COUNT; }
-    arr[..len].copy_from_slice(bytes);
+    let arr_ptr = arr.as_mut_ptr() as *mut u8;
+    unsafe { std::ptr::copy_nonoverlapping(bytes.as_ptr(), arr_ptr, len); }
 }
 
 const MAX_POINTERS: usize = 5;
@@ -63,24 +63,20 @@ static INPUT_SENDER: Lazy<Mutex<Option<SyncSender<input_event>>>> = Lazy::new(||
 static KEY_SENDER: Lazy<Mutex<Option<SyncSender<input_event>>>> = Lazy::new(|| Mutex::new(None));
 
 pub fn start_input_system(width: i32, height: i32) -> Result<()> {
-    thread::spawn(move || {
-        if let Err(e) = touch_server(width, height) { error!("Touch server error: {:?}", e); }
-    });
+    thread::spawn(move || { if let Err(e) = touch_server(width, height) { error!("Touch server error: {:?}", e); } });
     thread::spawn(|| {
         let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(async {
-            if let Err(e) = key_server().await { error!("Key server error: {:?}", e); }
-        });
+        rt.block_on(async { if let Err(e) = key_server().await { error!("Key server error: {:?}", e); } });
     });
     Ok(())
 }
 
 pub fn input_event_write(tx: &SyncSender<input_event>, kind: i32, code: i32, val: i32) -> Result<()> {
-    let mut tp = libc::timespec { tv_sec: 0, tv_nsec: 0 };
-    unsafe { libc::clock_gettime(libc::CLOCK_MONOTONIC, &mut tp); }
+    let mut tp = timespec { tv_sec: 0, tv_nsec: 0 };
+    unsafe { clock_gettime(CLOCK_MONOTONIC, &mut tp); }
     let ev = input_event {
         kind: kind as u16, code: code as u16, value: val,
-        time: timeval { tv_sec: tp.tv_sec, tv_usec: (tp.tv_nsec / 1000) as i64 },
+        time: timeval { tv_sec: tp.tv_sec as _, tv_usec: (tp.tv_nsec / 1000) as _ },
     };
     if tx.try_send(ev).is_err() { warn!("Input channel full, dropping event"); }
     Ok(())
@@ -97,8 +93,8 @@ pub fn handle_touch(ev: MotionEvent) -> Result<()> {
     static G_INPUT_MT: Lazy<Mutex<[i32; MAX_POINTERS]>> = Lazy::new(|| Mutex::new([0i32; MAX_POINTERS]));
     if let Some(mut mt) = G_INPUT_MT.try_lock() {
         match action {
-            MotionAction::Down | MotionAction::PointerDown => mt[pointer_id as usize] = 1,
-            MotionAction::Up | MotionAction::PointerUp | MotionAction::Cancel => mt[pointer_id as usize] = 0,
+            MotionAction::Down | MotionAction::PointerDown => { if (pointer_id as usize) < MAX_POINTERS { mt[pointer_id as usize] = 1; } },
+            MotionAction::Up | MotionAction::PointerUp | MotionAction::Cancel => { if (pointer_id as usize) < MAX_POINTERS { mt[pointer_id as usize] = 0; } },
             _ => (),
         }
     }
@@ -131,16 +127,14 @@ pub fn handle_touch(ev: MotionEvent) -> Result<()> {
 }
 
 fn generate_touch_device(width: i32, height: i32) -> device_info {
-    let mut info: device_info = unsafe { mem::zeroed() };  // Tambah : device_info
+    let mut info: device_info = unsafe { mem::zeroed() };
     info.driver_version = 0x1;
     info.id = input_id { product: 0x1, version: 0, vendor: 0, bustype: 0 };
     copy_to_cstr(TOUCH_DEVICE_NAME, &mut info.name);
     copy_to_cstr(TOUCH_PATH, &mut info.physical_location);
     copy_to_cstr(TOUCH_DEVICE_UNIQUE_ID, &mut info.unique_id);
     info.prop_bitmask[0] = INPUT_PROP_BUTTONPAD as u8;
-    for &bit in &[ABS_MT_SLOT, ABS_MT_POSITION_X, ABS_MT_POSITION_Y, ABS_MT_PRESSURE] {
-        set_bit(&mut info.abs_bitmask, bit as usize);
-    }
+    for &bit in &[ABS_MT_SLOT, ABS_MT_POSITION_X, ABS_MT_POSITION_Y, ABS_MT_PRESSURE] { set_bit(&mut info.abs_bitmask, bit as usize); }
     info.abs_min[ABS_MT_POSITION_X as usize] = 0;
     info.abs_max[ABS_MT_POSITION_X as usize] = width as u32;
     info.abs_min[ABS_MT_POSITION_Y as usize] = 0;
@@ -155,7 +149,7 @@ fn generate_touch_device(width: i32, height: i32) -> device_info {
 fn set_bit(bitmask: &mut [u8], bit: usize) {
     let byte = bit / 8;
     let offset = bit % 8;
-    bitmask[byte] |= 1 << offset;
+    if byte < bitmask.len() { bitmask[byte] |= 1 << offset; }
 }
 
 #[allow(unreachable_code)]
@@ -163,13 +157,8 @@ fn touch_server(width: i32, height: i32) -> Result<()> {
     let device = generate_touch_device(width, height);
     loop {
         let _ = std::fs::remove_file(TOUCH_PATH);
-        let listener = std::os::unix::net::UnixListener::bind(TOUCH_PATH)
-            .map_err(|e| anyhow!("Bind touch socket failed: {:?}", e))?;
-        unsafe {
-            if let Ok(path_cstr) = std::ffi::CString::new(TOUCH_PATH) {
-                libc::chmod(path_cstr.as_ptr(), 0o777);
-            }
-        }
+        let listener = std::os::unix::net::UnixListener::bind(TOUCH_PATH).map_err(|e| anyhow!("Bind touch socket failed: {:?}", e))?;
+        if let Ok(path_cstr) = std::ffi::CString::new(TOUCH_PATH) { unsafe { libc::chmod(path_cstr.as_ptr(), 0o777); } }
         for stream in listener.incoming() {
             if let Ok(mut stream) = stream {
                 info!("Game input connected!");
@@ -182,10 +171,7 @@ fn touch_server(width: i32, height: i32) -> Result<()> {
                         Ok(ev) => {
                             let data = unsafe { any_as_u8_slice(&ev) };
                             if let Err(e) = stream.write_all(data) {
-                                if e.kind() != std::io::ErrorKind::WouldBlock {
-                                    error!("Broken pipe, reconnecting...");
-                                    break;
-                                }
+                                if e.kind() != std::io::ErrorKind::WouldBlock { error!("Broken pipe, reconnecting..."); break; }
                             }
                         },
                         Err(_) => break,
@@ -200,15 +186,13 @@ fn touch_server(width: i32, height: i32) -> Result<()> {
 }
 
 fn generate_key_device() -> device_info {
-    let mut info: device_info = unsafe { mem::zeroed() };  // Tambah : device_info
+    let mut info: device_info = unsafe { mem::zeroed() };
     info.driver_version = 0x1;
     info.id = input_id { product: 0x1, version: 0, vendor: 0, bustype: 0 };
     copy_to_cstr(KEY_DEVICE_NAME, &mut info.name);
     copy_to_cstr(KEY_PATH, &mut info.physical_location);
     copy_to_cstr(KEY_DEVICE_UNIQUE_ID, &mut info.unique_id);
-    for &bit in &[KEY_BACK, KEY_ENTER] {
-        set_bit(&mut info.key_bitmask, bit as usize);
-    }
+    for &bit in &[KEY_BACK, KEY_ENTER] { set_bit(&mut info.key_bitmask, bit as usize); }
     info
 }
 
@@ -245,10 +229,7 @@ async fn key_server() -> Result<()> {
                     }
                 });
             }
-            Err(_) => {
-                error!("key server accept error!");
-                break;
-            }
+            Err(_) => { error!("key server accept error!"); break; }
         }
     }
     Ok(())
