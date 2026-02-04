@@ -4,23 +4,12 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-/*
- * This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at https://mozilla.org/MPL/2.0/.
- */
-
-/*
- * This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at https://mozilla.org/MPL/2.0/.
- */
-
 package io.twoyi;
 
 import android.net.LocalSocket;
 import android.net.LocalSocketAddress;
 import android.os.Looper;
+import android.util.Log;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -52,15 +41,25 @@ public class TwoyiMessenger {
     public void connect() {
         if (this.socket != null) return;
 
-        try {
-            this.socket = new LocalSocket(LocalSocket.SOCKET_SEQPACKET);
-            this.socket.connect(new LocalSocketAddress(SOCK_NAME));
-            InputStream is = this.socket.getInputStream();
-            OutputStream os = this.socket.getOutputStream();
-            this.mWriter = new OutputStreamWriter(os);
-        } catch (IOException e) {
-            e.printStackTrace();
+        int retryCount = 0;
+        final int maxRetries = 3;
+        while (retryCount < maxRetries) {
+            try {
+                this.socket = new LocalSocket(LocalSocket.SOCKET_SEQPACKET);
+                this.socket.connect(new LocalSocketAddress(SOCK_NAME, LocalSocketAddress.Namespace.ABSTRACT), 5000);
+                InputStream is = this.socket.getInputStream();
+                OutputStream os = this.socket.getOutputStream();
+                this.mWriter = new OutputStreamWriter(os);
+                return;
+            } catch (IOException e) {
+                e.printStackTrace();
+                retryCount++;
+                try {
+                    Thread.sleep(1000 * retryCount);
+                } catch (InterruptedException ignored) {}
+            }
         }
+        Log.e(TAG, "Failed to connect after retries");
     }
 
     public static synchronized TwoyiMessenger getInstance() {

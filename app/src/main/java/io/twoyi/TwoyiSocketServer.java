@@ -4,18 +4,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-/*
- * This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at https://mozilla.org/MPL/2.0/.
- */
-
-/*
- * This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at https://mozilla.org/MPL/2.0/.
- */
-
 package io.twoyi;
 
 import android.content.Context;
@@ -83,29 +71,35 @@ public class TwoyiSocketServer {
     }
 
     private void start0() {
-        LocalSocket socket = null;
-        try {
-            socket = new LocalSocket(LocalSocket.SOCKET_SEQPACKET);
-            socket.bind(new LocalSocketAddress(SOCK_NAME, LocalSocketAddress.Namespace.ABSTRACT));
-            LocalServerSocket localServerSocket = new LocalServerSocket(socket.getFileDescriptor());
+        final int maxRetries = 5;
+        for (int retryCount = 0; retryCount < maxRetries; retryCount++) {
+            LocalSocket socket = null;
+            try {
+                socket = new LocalSocket(LocalSocket.SOCKET_SEQPACKET);
+                socket.bind(new LocalSocketAddress(SOCK_NAME, LocalSocketAddress.Namespace.ABSTRACT));
+                LocalServerSocket localServerSocket = new LocalServerSocket(socket.getFileDescriptor());
 
-            Thread currentThread = Thread.currentThread();
-            while (!currentThread.isInterrupted()) {
-                LocalSocket localSocket = localServerSocket.accept();
-                handleSocket(localSocket);
+                Log.i(TAG, "Socket server started successfully");
+                Thread currentThread = Thread.currentThread();
+                while (!currentThread.isInterrupted()) {
+                    try {
+                        LocalSocket localSocket = localServerSocket.accept();
+                        handleSocket(localSocket);
+                    } catch (IOException e) {
+                        Log.w(TAG, "Accept failed, continuing...", e);
+                        SystemClock.sleep(100);
+                    }
+                }
+                return;
+            } catch (IOException e) {
+                Log.e(TAG, "Start socket failed, retrying... Attempt: " + (retryCount + 1) + "/" + maxRetries, e);
+                mStarted.set(false);
+                SystemClock.sleep(500 * (retryCount + 1));
+            } finally {
+                IOUtils.closeSilently(socket);
             }
-        } catch (IOException e) {
-            Log.e(TAG, "start socket failed", e);
-
-            mStarted.set(false);
-
-            // start it again
-            SystemClock.sleep(1000);
-
-            start();
-        } finally {
-            IOUtils.closeSilently(socket);
         }
+        Log.e(TAG, "Max retries reached (" + maxRetries + "), giving up.");
     }
 
     private void handleSocket(LocalSocket socket) {
@@ -120,6 +114,7 @@ public class TwoyiSocketServer {
             while (!currentThread.isInterrupted()) {
                 byte[] data = new byte[1024];
                 int read = inputStream.read(data);
+                if (read == -1) break;
                 handleData(new String(data, 0, read, StandardCharsets.US_ASCII));
             }
         } catch (IOException ignored) {

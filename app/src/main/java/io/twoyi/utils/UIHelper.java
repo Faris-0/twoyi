@@ -57,6 +57,7 @@ import moe.feng.alipay.zerosdk.AlipayZeroSdk;
  * @date 2018/7/21.
  */
 public class UIHelper {
+
     private static final AndroidDeferredManager gDM = new AndroidDeferredManager();
 
     public static ExecutorService GLOBAL_EXECUTOR = Executors.newCachedThreadPool();
@@ -66,9 +67,7 @@ public class UIHelper {
     }
 
     public static void dismiss(Dialog dialog) {
-        if (dialog == null) {
-            return;
-        }
+        if (dialog == null) return;
 
         try {
             dialog.dismiss();
@@ -81,18 +80,16 @@ public class UIHelper {
         try {
             // 获取剪贴板管理服务
             ClipboardManager cm = (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
-            if (cm == null) {
-                return;
-            }
-            cm.setText(weixin);
+            if (cm == null) return;
+            cm.setPrimaryClip(ClipData.newPlainText("weixin", weixin));
 
             Intent intent = new Intent(Intent.ACTION_MAIN);
             ComponentName cmp = new ComponentName("com.tencent.mm", "com.tencent.mm.ui.LauncherUI");
             intent.addCategory(Intent.CATEGORY_LAUNCHER);
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             intent.setComponent(cmp);
-
             context.startActivity(intent);
+
             Toast.makeText(context, R.string.wechat_public_account_tips, Toast.LENGTH_LONG).show();
         } catch (Throwable e) {
             Toast.makeText(context, "WeChat is not installed.", Toast.LENGTH_SHORT).show();
@@ -100,9 +97,7 @@ public class UIHelper {
     }
 
     public static void show(Dialog dialog) {
-        if (dialog == null) {
-            return;
-        }
+        if (dialog == null) return;
 
         try {
             dialog.show();
@@ -119,9 +114,7 @@ public class UIHelper {
 
     public static AlertDialog.Builder getWebViewBuilder(Context context, String title, String url) {
         AlertDialog.Builder dialogBuilder = getDialogBuilder(context);
-        if (!TextUtils.isEmpty(title)) {
-            dialogBuilder.setTitle(title);
-        }
+        if (!TextUtils.isEmpty(title)) dialogBuilder.setTitle(title);
         WebView webView = new WebView(context);
         webView.loadUrl(url);
         dialogBuilder.setView(webView);
@@ -152,9 +145,7 @@ public class UIHelper {
     }
 
     public static void showDonateDialog(Activity activity) {
-        if (activity == null) {
-            return;
-        }
+        if (activity == null) return;
 
         final String alipay = activity.getResources().getString(R.string.donate_alipay);
         final String donateOthers = activity.getResources().getString(R.string.donate_others);
@@ -196,9 +187,7 @@ public class UIHelper {
     public static void showPrivacy(Context context) {
         try {
             Intent intent = new Intent(Intent.ACTION_VIEW);
-            if (!(context instanceof Activity)) {
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            }
+            if (!(context instanceof Activity)) intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             intent.setData(Uri.parse("https://twoyi.app/privacy"));
             context.startActivity(intent);
         } catch (Throwable ignored) {
@@ -208,9 +197,7 @@ public class UIHelper {
     public static void showFAQ(Context context) {
         try {
             Intent intent = new Intent(Intent.ACTION_VIEW);
-            if (!(context instanceof Activity)) {
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            }
+            if (!(context instanceof Activity)) intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             intent.setData(Uri.parse("https://twoyi.app/guide"));
             context.startActivity(intent);
         } catch (Throwable ignored) {
@@ -237,33 +224,20 @@ public class UIHelper {
     }
 
     public static int dpToPx(Context context, int dp) {
-        return (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dp,
-                context.getResources().getDisplayMetrics());
+        return (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dp, context.getResources().getDisplayMetrics());
     }
 
     public static List<ApplicationInfo> getInstalledApplications(PackageManager packageManager) {
-        if (packageManager == null) {
-            return Collections.emptyList();
-        }
+        if (packageManager == null) return Collections.emptyList();
 
-        @SuppressLint("WrongConstant")
-        List<ApplicationInfo> installedApplications = packageManager.getInstalledApplications(PackageManager.GET_UNINSTALLED_PACKAGES
-                | PackageManager.GET_DISABLED_COMPONENTS);
+        List<ApplicationInfo> installedApplications = packageManager.getInstalledApplications(PackageManager.GET_UNINSTALLED_PACKAGES | PackageManager.GET_DISABLED_COMPONENTS);
         int userApp = 0;
-        for (ApplicationInfo installedApplication : installedApplications) {
-            if ((installedApplication.flags & ApplicationInfo.FLAG_SYSTEM) == 0) {
-                if (userApp++ > 3) {
-                    return installedApplications;
-                }
-            }
-        }
+        for (ApplicationInfo installedApplication : installedApplications) if ((installedApplication.flags & ApplicationInfo.FLAG_SYSTEM) == 0) if (userApp++ > 3) return installedApplications;
 
         List<ApplicationInfo> applicationInfos = new ArrayList<>();
         for (int uid = 0; uid <= Process.LAST_APPLICATION_UID; uid++) {
             String[] packagesForUid = packageManager.getPackagesForUid(uid);
-            if (packagesForUid == null || packagesForUid.length == 0) {
-                continue;
-            }
+            if (packagesForUid == null) continue;
             for (String pkg : packagesForUid) {
                 try {
                     ApplicationInfo applicationInfo = packageManager.getApplicationInfo(pkg, 0);
@@ -277,9 +251,7 @@ public class UIHelper {
     }
 
     public static String toModuleScope(Set<String> scopes) {
-        if (scopes == null || scopes.isEmpty()) {
-            return "";
-        }
+        if (scopes == null || scopes.isEmpty()) return "";
 
         StringBuilder sb = new StringBuilder();
         int size = scopes.size();
@@ -288,10 +260,7 @@ public class UIHelper {
         for (String scope : scopes) {
             sb.append(scope);
 
-            if (i++ < size - 1) {
-                sb.append(',');
-            }
-
+            if (i++ < size - 1) sb.append(',');
         }
         return sb.toString();
     }
@@ -302,40 +271,27 @@ public class UIHelper {
         intent.putExtra(Intent.EXTRA_SUBJECT, context.getString(shareTitle));
         intent.putExtra(Intent.EXTRA_TEXT, extraText);//extraText为文本的内容
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);//为Activity新建一个任务栈
-        context.startActivity(
-                Intent.createChooser(intent, context.getString(shareTitle)));
+        context.startActivity(Intent.createChooser(intent, context.getString(shareTitle)));
     }
 
     public static String paste(Context context) {
         ClipboardManager manager = (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
-        if (manager == null) {
-            return null;
-        }
+        if (manager == null) return null;
         boolean hasPrimaryClip = manager.hasPrimaryClip();
-        if (!hasPrimaryClip) {
-            return null;
-        }
+        if (!hasPrimaryClip) return null;
         ClipData primaryClip = manager.getPrimaryClip();
-        if (primaryClip == null) {
-            return null;
-        }
-        if (primaryClip.getItemCount() <= 0) {
-            return null;
-        }
+        if (primaryClip == null) return null;
+        if (primaryClip.getItemCount() <= 0) return null;
         CharSequence addedText = primaryClip.getItemAt(0).getText();
         return String.valueOf(addedText);
     }
 
     public static void startActivity(Context context, Class<?> clazz) {
-        if (context == null) {
-            return;
-        }
+        if (context == null) return;
 
         Intent intent = new Intent(context, clazz);
 
-        if (!(context instanceof Activity)) {
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        }
+        if (!(context instanceof Activity)) intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 
         try {
             context.startActivity(intent);
@@ -343,21 +299,12 @@ public class UIHelper {
         }
     }
 
-    @TargetApi(Build.VERSION_CODES.LOLLIPOP)
     private static boolean isVM64(Set<String> supportedABIs) {
-        if (Build.SUPPORTED_64_BIT_ABIS.length == 0) {
-            return false;
-        }
+        if (Build.SUPPORTED_64_BIT_ABIS.length == 0) return false;
 
-        if (supportedABIs == null || supportedABIs.isEmpty()) {
-            return true;
-        }
+        if (supportedABIs == null || supportedABIs.isEmpty()) return true;
 
-        for (String supportedAbi : supportedABIs) {
-            if ("arm64-v8a".endsWith(supportedAbi) || "x86_64".equals(supportedAbi) || "mips64".equals(supportedAbi)) {
-                return true;
-            }
-        }
+        for (String supportedAbi : supportedABIs) if ("arm64-v8a".endsWith(supportedAbi) || "x86_64".equals(supportedAbi) || "mips64".equals(supportedAbi)) return true;
 
         return false;
     }
@@ -369,9 +316,7 @@ public class UIHelper {
             while (entries.hasMoreElements()) {
                 ZipEntry entry = entries.nextElement();
                 String name = entry.getName();
-                if (name.contains("../")) {
-                    continue;
-                }
+                if (name.contains("../")) continue;
                 if (name.startsWith("lib/") && !entry.isDirectory() && name.endsWith(".so")) {
                     String supportedAbi = name.substring(name.indexOf("/") + 1, name.lastIndexOf("/"));
                     supportedABIs.add(supportedAbi);

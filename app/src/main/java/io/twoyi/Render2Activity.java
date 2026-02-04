@@ -4,18 +4,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-/*
- * This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at https://mozilla.org/MPL/2.0/.
- */
-
-/*
- * This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at https://mozilla.org/MPL/2.0/.
- */
-
 package io.twoyi;
 
 import android.app.Activity;
@@ -39,6 +27,8 @@ import androidx.annotation.NonNull;
 
 import com.cleveroad.androidmanimation.LoadingAnimationView;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -64,6 +54,7 @@ public class Render2Activity extends Activity implements View.OnTouchListener {
     private View mBootLogView;
 
     private final AtomicBoolean mIsExtracting = new AtomicBoolean(false);
+    private final ExecutorService mExecutor = Executors.newSingleThreadExecutor();
 
     private final SurfaceHolder.Callback mSurfaceCallback = new SurfaceHolder.Callback() {
         @Override
@@ -157,7 +148,7 @@ public class Render2Activity extends Activity implements View.OnTouchListener {
 
             showTipsForFirstBoot();
 
-            new Thread(() -> {
+            mExecutor.submit(() -> {
                 mIsExtracting.set(true);
                 RomManager.extractRootfs(getApplicationContext(), romExist, factoryRomUpdated, forceInstall, use3rdRom);
                 mIsExtracting.set(false);
@@ -168,7 +159,7 @@ public class Render2Activity extends Activity implements View.OnTouchListener {
                     mRootView.addView(mSurfaceView, 0);
                     showBootingProcedure();
                 });
-            }, "extract-rom").start();
+            });
         } else {
             mRootView.addView(mSurfaceView, 0);
             showBootingProcedure();
@@ -255,16 +246,19 @@ public class Render2Activity extends Activity implements View.OnTouchListener {
     private float getBestFps() {
         WindowManager windowManager = getWindowManager();
         Display defaultDisplay = windowManager.getDefaultDisplay();
+        float fps = 60;
         Display.Mode[] supportedModes = defaultDisplay.getSupportedModes();
-        float fps = 45;
         for (Display.Mode supportedMode : supportedModes) {
             float refreshRate = supportedMode.getRefreshRate();
-            if (refreshRate > fps) {
-                // fps = refreshRate;
-            }
+            if (refreshRate > fps && refreshRate <= 120) fps = refreshRate;
         }
-
-        Log.w(TAG, "current fps: " + fps);
+        Log.w(TAG, "Best FPS: " + fps);
         return fps;
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        mExecutor.shutdown();
     }
 }

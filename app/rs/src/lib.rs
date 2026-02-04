@@ -101,28 +101,41 @@ pub unsafe fn renderer_init(mut env: JNIEnv, _clz: jclass, surface: jobject, loa
         return;
     }
     thread::spawn(move || {
-        unsafe { libc::setpriority(libc::PRIO_PROCESS, 0, -10); }
+        if unsafe { libc::setpriority(libc::PRIO_PROCESS, 0, -10) } != 0 {
+            error!("Failed to set thread priority: {:?}", std::io::Error::last_os_error());
+        }
         renderer_bindings::startOpenGLRenderer(window.ptr().as_ptr() as *mut c_void, w, h, xdpi as i32, ydpi as i32, safe_fps);
     });
-    if let Ok(loader_str) = env.get_string(&JString::from_raw(loader)) {
-        if let Err(e) = spawn_container_process(loader_str.into()) {
-            error!("Spawn container failed: {:?}", e);
+    match env.get_string(&JString::from_raw(loader)) {
+        Ok(loader_str) => {
+            if let Err(e) = spawn_container_process(loader_str.into()) {
+                error!("Spawn container failed: {:?}", e);
+            }
         }
+        Err(e) => error!("Failed to get loader string: {:?}", e),
     }
 }
 
 #[no_mangle]
 pub unsafe fn renderer_reset_window(env: JNIEnv, _clz: jclass, surface: jobject, _top: jint, _left: jint, _w: jint, _h: jint) {
     let surface_obj = JObject::from_raw(surface);
-    let window = ndk_sys::ANativeWindow_fromSurface(env.get_native_interface(), surface_obj.as_raw());
-    renderer_bindings::resetSubWindow(window as *mut c_void, 0, 0, _w, _h, _w, _h, 1.0, 0.0);
+    let window_ptr = ndk_sys::ANativeWindow_fromSurface(env.get_native_interface(), surface_obj.as_raw());
+    if window_ptr.is_null() {
+        error!("Surface null in reset_window");
+        return;
+    }
+    renderer_bindings::resetSubWindow(window_ptr as *mut c_void, 0, 0, _w, _h, _w, _h, 1.0, 0.0);
 }
 
 #[no_mangle]
 pub unsafe fn renderer_remove_window(env: JNIEnv, _clz: jclass, surface: jobject) {
     let surface_obj = JObject::from_raw(surface);
-    let window = ndk_sys::ANativeWindow_fromSurface(env.get_native_interface(), surface_obj.as_raw());
-    renderer_bindings::removeSubWindow(window as *mut c_void);
+    let window_ptr = ndk_sys::ANativeWindow_fromSurface(env.get_native_interface(), surface_obj.as_raw());
+    if window_ptr.is_null() {
+        error!("Surface null in remove_window");
+        return;
+    }
+    renderer_bindings::removeSubWindow(window_ptr as *mut c_void);
 }
 
 #[no_mangle]
@@ -148,30 +161,19 @@ pub fn send_key_code(_env: JNIEnv, _clz: jclass, keycode: jint) {
     }
 }
 
-unsafe fn register_natives(jvm: &JavaVM, class_name: &str, methods: &[NativeMethod]) -> jint {
-    let mut env = jvm.get_env().unwrap();
-    let version: jint = env.get_version().unwrap().into();
-    let clazz = match env.find_class(class_name) {
-        Ok(c) => c,
-        Err(e) => {
-            error!("Class not found: {:?}", e);
-            return JNI_ERR;
-        }
-    };
-    let result = env.register_native_methods(&clazz, methods);
-    if result.is_ok() {
-        debug!("Natives registered");
-        version
-    } else {
-        error!("Register failed");
-        JNI_ERR
-    }
+unsafe fn register_natives(jvm: &JavaVM, class_name: &str, methods: &[NativeMethod]) -> Result<jint, Box<dyn std::error::Error>> {
+    let mut env = jvm.get_env().map_err(|e| format!("Failed to get env: {:?}", e))?;
+    let version: jint = env.get_version().map_err(|e| format!("Failed to get version: {:?}", e))?.into();
+    let clazz = env.find_class(class_name).map_err(|e| format!("Class not found: {:?}", e))?;
+    env.register_native_methods(&clazz, methods).map_err(|e| format!("Register failed: {:?}", e))?;
+    debug!("Natives registered");
+    Ok(version)
 }
 
 #[no_mangle]
 #[allow(non_snake_case)]
 unsafe fn JNI_OnLoad(jvm: JavaVM, _reserved: *mut c_void) -> jint {
-    android_logger::init_once(Config::default().with_max_level(LevelFilter::Info).with_tag("CLIENT_EGL"));
+    android_logger::init_once(Config::default().with_max_level(LevelFilter::Warn).with_tag("CLIENT_EGL"));
     let class_name = "io/twoyi/Renderer";
     let methods = [
         jni_method!(init, renderer_init, "(Landroid/view/Surface;Ljava/lang/String;FFI)V"),
@@ -180,5 +182,11 @@ unsafe fn JNI_OnLoad(jvm: JavaVM, _reserved: *mut c_void) -> jint {
         jni_method!(handleTouch, handle_touch, "(Landroid/view/MotionEvent;)V"),
         jni_method!(sendKeycode, send_key_code, "(I)V"),
     ];
-    register_natives(&jvm, class_name, &methods)
+    match register_natives(&jvm, class_name, &methods) {
+        Ok(version) => version,
+        Err(e) => {
+            error!("JNI_OnLoad failed: {}", e);
+            JNI_ERR
+        }
+    }
 }

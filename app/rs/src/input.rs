@@ -15,6 +15,7 @@ use std::sync::mpsc::SyncSender;
 use once_cell::sync::Lazy;
 use log::{info, error, warn};
 use anyhow::{Result, anyhow};
+use std::time::Duration;
 
 const KEY_BACK: i32 = 158;
 const KEY_ENTER: i32 = 28;
@@ -46,6 +47,9 @@ struct device_info {
 }
 
 unsafe fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8] {
+    if std::mem::size_of::<T>() == 0 {
+        return &[];
+    }
     ::std::slice::from_raw_parts((p as *const T) as *const u8, ::std::mem::size_of::<T>())
 }
 
@@ -176,11 +180,13 @@ fn touch_server(width: i32, height: i32) -> Result<()> {
                         },
                         Err(_) => break,
                     }
+                    thread::sleep(Duration::from_millis(1));
                 }
                 *INPUT_SENDER.lock() = None;
                 break;
             }
         }
+        thread::sleep(Duration::from_millis(10));
     }
     Ok(())
 }
@@ -226,11 +232,13 @@ async fn key_server() -> Result<()> {
                             },
                             Err(_) => break,
                         }
+                        tokio::time::sleep(Duration::from_millis(1)).await;
                     }
                 });
             }
             Err(_) => { error!("key server accept error!"); break; }
         }
+        tokio::time::sleep(Duration::from_millis(10)).await;
     }
     Ok(())
 }

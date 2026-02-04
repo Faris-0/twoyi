@@ -109,8 +109,7 @@ public final class RomManager {
     }
 
     private static void killOrphanProcess() {
-        Shell shell = ShellUtil.newSh();
-        shell.newJob().add("ps -ef | awk '{if($3==1) print $2}' | xargs kill -9").exec();
+        ShellUtil.newSh().newJob().add("ps -ef | awk '{if($3==1) print $2}' | xargs kill -9").exec();
     }
 
     private static void saveLastKmsg(Context context) {
@@ -177,7 +176,7 @@ public final class RomManager {
     }
 
     public static RomInfo getRomInfo(File rom) {
-        try (SevenZFile zFile = new SevenZFile(rom)) {
+        try (SevenZFile zFile = new SevenZFile.Builder().setFile(rom).get()) {
             SevenZArchiveEntry entry;
             while ((entry = zFile.getNextEntry()) != null) {
                 if (entry.getName().equals("rootfs/rom.ini")) {
@@ -241,7 +240,8 @@ public final class RomManager {
     }
 
     private static void showRootfsInstallationFailure(Context context) {
-        // TODO
+        // TODO: Implement proper error dialog or logging
+        Log.e(TAG, "Rootfs installation failed");
     }
 
     public static void reboot(Context context) {
@@ -277,7 +277,8 @@ public final class RomManager {
             int count;
             while ((count = inputStream.read(buffer)) > 0) os.write(buffer, 0, count);
         } catch (IOException e) {
-            e.printStackTrace();
+            Log.e(TAG, "Error extracting rootfs from assets", e);
+            return false;
         }
         long t2 = SystemClock.elapsedRealtime();
 
@@ -285,7 +286,7 @@ public final class RomManager {
 
         long t3 = SystemClock.elapsedRealtime();
 
-        Log.i(TAG, "extract rootfs, read assets: " + (t2 - t1) + " un7z: " + (t3 - t2) + "ret: " + ret);
+        Log.i(TAG, "extract rootfs, read assets: " + (t2 - t1) + " un7z: " + (t3 - t2) + " ret: " + ret);
 
         return ret == 0;
     }
