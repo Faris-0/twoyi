@@ -77,7 +77,7 @@ This repository contains the twoyi app, and the twoyi ROM is currently being tur
 
 Twoyi is partially written in Rust, so it's nessesary to [install Rust and Cargo](https://www.rust-lang.org/tools/install) first.
 
-#### Install cargo-xdk
+#### Install cargo-ndk
 
 Please refer to [cargo-ndk](https://github.com/bbqsrc/cargo-ndk).
 
